@@ -1,0 +1,43 @@
+---
+- include: bootstrap-ubuntu.yml
+  when: bootstrap_os == "ubuntu"
+
+- include: bootstrap-debian.yml
+  when: bootstrap_os == "debian"
+
+- include: bootstrap-coreos.yml
+  when: bootstrap_os == "coreos"
+
+- include: bootstrap-centos.yml
+  when: bootstrap_os == "centos"
+
+- include: setup-pipelining.yml
+
+- name: check if atomic host
+  stat:
+    path: /run/ostree-booted
+  register: ostree
+
+- set_fact:
+    is_atomic: "{{ ostree.stat.exists }}"
+
+- name: Gather nodes hostnames
+  setup:
+    gather_subset: '!all'
+    filter: ansible_*
+
+- name: Assign inventory name to unconfigured hostnames (non-CoreOS)
+  hostname:
+    name: "{{inventory_hostname}}"
+  when: ansible_os_family not in ['CoreOS', 'Container Linux by CoreOS']
+
+- name: Assign inventory name to unconfigured hostnames (CoreOS only)
+  command: "hostnamectl set-hostname  {{inventory_hostname}}"
+  register: hostname_changed
+  when: ansible_hostname == 'localhost' and ansible_os_family in ['CoreOS', 'Container Linux by CoreOS']
+
+- name: Update hostname fact (CoreOS only)
+  setup:
+    gather_subset: '!all'
+    filter: ansible_hostname
+  when: ansible_os_family in ['CoreOS', 'Container Linux by CoreOS'] and hostname_changed.changed
