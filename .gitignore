@@ -1,2 +1,7 @@
-cybera.gpg
+*.gpg
 kubespray.tar.gz
+openrc.sh
+*.tfstate
+*.tfstate.backup
+*.retry
+terraform/.terraform
