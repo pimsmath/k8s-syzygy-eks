@@ -1,0 +1,6 @@
+- src: git+https://github.com/geerlingguy/ansible-role-repo-epel.git
+  version: "1.2.2"
+  name: ansible-role-repo-epel
+- src: git+https://github.com/willshersystems/ansible-sshd.git
+  version: "0.5.1"
+  name: ansible-sshd

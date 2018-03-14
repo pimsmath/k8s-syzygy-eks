@@ -1,0 +1,3 @@
+sshd_PasswordAuthenticaton: no
+sshd_PermitRootLogin: no
+sshd_AllowUsers: "ptty2u"

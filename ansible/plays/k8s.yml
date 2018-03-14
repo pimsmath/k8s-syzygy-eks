@@ -1,0 +1,11 @@
+---
+
+- name: Kubernetes Cluster Setup
+  hosts: all
+  become: true
+
+  roles:
+    - { role: base-packages,               tags: ["setup", "base"] }
+    - { role: ssh-public-keys,             tags: ["setup", "ssh"] }
+    - { role: ansible-sudo,                tags: ["setup", "sudo"] }
+    - { role: ansible-sshd,                tags: ["setup", "sshd"] }

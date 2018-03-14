@@ -74,11 +74,18 @@ Host 10.0.0.*
 
 Now run ansible to update the hosts
 ```
-  $ ansible -i my_inventory/inventory.ini -b -m command -a 'w' all
-  $ ansible -i my_inventory/inventory.ini -b -m yum -a 'name=* state=latest' all
-  $ ansible -i my_inventory/inventory.ini -b -m command -a 'reboot' all
+  $ cd ansible
+  $ ansible -i ./inventory.ini -b -m command -a 'w' all
+  $ ansible -i ./inventory.ini -b -m yum -a 'name=* state=latest' all
+  $ ansible -i ./inventory.ini -b -m command -a 'reboot' all
 ```
 
+There is also a playbook to update ssh keys and perform some other housekeeping
+tasks
+``` 
+  $ cd ansible
+  $ ansible-playbook plays/k8s.yml
+```
 
 ## kubespray
 
