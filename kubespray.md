@@ -1,231 +1,133 @@
-Starting from a new project definition on cybera's RAC
+Starting from a new project definition on ComputeCanada's west cloud
 
 ## Prerequisites
 ### Python / Ansible / Terraform
 Download an up to date RC file from the project overview page and source it so
 that we can authenticate to the openstack API. Terraform will need a few extra
-variables as well. The file below sort of works, to do this. It expects to find
-a file called cc.gpg in the same directory which should consist of a single line
-with the username and password in the form "username:password".
-
-There are some hard coded paths which should probably be improved or removed.
-```
-#!/usr/bin/env bash
-
-# To use an OpenStack cloud you need to authenticate against the Identity
-# service named keystone, which returns a **Token** and **Service Catalog**.
-# The catalog contains the endpoints for all services the user/tenant has
-# access to - such as Compute, Image Service, Identity, Object Storage, Block
-# Storage, and Networking (code-named nova, glance, keystone, swift,
-# cinder, and neutron).
-#
-# *NOTE*: Using the 2.0 *Identity API* does not necessarily mean any other
-# OpenStack API is version 2.0. For example, your cloud provider may implement
-# Image API v1.1, Block Storage API v2, and Compute API v2.0. OS_AUTH_URL is
-# only for the Identity API served through keystone.
-export OS_AUTH_URL=https://west.cloud.computecanada.ca:5000/v2.0
-
-# With the addition of Keystone we have standardized on the term **tenant**
-# as the entity that owns the resources.
-export OS_TENANT_ID=9f627f6d145f43f384c9b75c4cab207d
-export OS_TENANT_NAME="ipm-500"
-
-# unsetting v3 items in case set
-unset OS_PROJECT_ID
-unset OS_PROJECT_NAME
-unset OS_USER_DOMAIN_NAME
-unset OS_INTERFACE
-
-
-# If your configuration has multiple regions, we set that information here.
-# OS_REGION_NAME is optional and only valid in certain environments.
-export OS_REGION_NAME="regionOne"
-# Don't leave a blank variable, unset it if it was empty
-if [ -z "$OS_REGION_NAME" ]; then unset OS_REGION_NAME; fi
-
-export OS_ENDPOINT_TYPE=publicURL
-export OS_IDENTITY_API_VERSION=2
-
-KEYFILE="./cc.gpg" 
-if [ -x "/usr/bin/gpg2" ] ; then
-    GPG2="/usr/bin/gpg2"
-elif [ -x "/usr/local/bin/gpg2" ] ; then
-    GPG2="/usr/local/bin/gpg2"
-else
-    echo "Can't find GPG2, not setting OS_PASSWORD"
-fi
-OS_AUTH=$(${GPG2} -d ${KEYFILE})
-OS_USERNAME=$(/bin/echo $OS_AUTH | /usr/bin/cut -f1 -d:)
-OS_PASSWORD=$(/bin/echo $OS_AUTH | /usr/bin/cut -f2 -d:)
-export OS_USERNAME
-export OS_PASSWORD
-
-
-export TF_VAR_os_cybera_password=${OS_PASSWORD}
-ulimit -n 1024
-clear
-
+variables as well. There's an init script in the root of this repository which
+will look for openrc.sh with the correct variables for project etc. and will
+prompt you for your openstack credentials
 
 ```
-Source all of the above
-```
-  $ . init-ian
+  . init.sh
 ```
 
 ### Terraform
 
-Because of permissions not granted to us inside openstack we have to create the
-infrastructure ourselves. We can make some guesses based on the
-contrib/terraform/openstack configuration
+Terraform is used to define 3 VMs running CentOS 7 on a smallish flavour. The
+variables.tf file defines defaults for some standard variables and these can be
+overriden by setting the corresponding environment variable (e.g.
+TF_VAR_os_password). If you have sourced the init.sh script above then you
+should be ready to go. In most cases you can just run `terraform plan` to see
+what actions will be taken, but you may need to run `terraform init` to grab the
+openstack plugin (running terraform plan should inform you if that is the case).
+
 ```
-provider "openstack" {
-  user_name    = "${lookup(var.os_cybera, "user_name")}"
-  password     = "${var.os_cybera_password}"
-  auth_url     = "${lookup(var.os_cybera, "auth_url")}"
-  tenant_name  = "${lookup(var.os_cybera, "tenant_name")}"
-  tenant_id    = "${lookup(var.os_cybera, "tenant_id")}"
-  region       = "${lookup(var.os_cybera, "region")}"
-}
-
-resource "openstack_networking_floatingip_v2" "fip_1" {
-  pool         = "public"
-}
-
-resource "openstack_networking_floatingip_v2" "fip_2" {
-  pool         = "public"
-}
-
-resource "openstack_compute_floatingip_associate_v2" "fip_1" {
-  floating_ip = "${openstack_networking_floatingip_v2.fip_1.address}"
-  instance_id = "${openstack_compute_instance_v2.master1.id}"
-  fixed_ip = "${openstack_compute_instance_v2.master1.network.0.fixed_ip_v4}"
-}
-
-resource "openstack_compute_floatingip_associate_v2" "fip_2" {
-  floating_ip = "${openstack_networking_floatingip_v2.fip_2.address}"
-  instance_id = "${openstack_compute_instance_v2.master2.id}"
-  fixed_ip = "${openstack_compute_instance_v2.master2.network.0.fixed_ip_v4}"
-}
-
-resource "openstack_compute_instance_v2" "master1" {
-  name            = "master1"
-  image_id        = "10076751-ace0-49b2-ba10-cfa22a98567d"
-  flavor_id       = "2"
-  key_pair        = "id_cybera_openstack"
-  security_groups = ["default","ssh","ping"]
-  user_data = "${var.cloudconfig_default_user}"
-  network {
-    name = "k8s-network"
-    fixed_ip_v4 = "192.168.180.90"
-  }
-}
-
-resource "openstack_compute_instance_v2" "master2" {
-  name            = "master2"
-  image_id        = "10076751-ace0-49b2-ba10-cfa22a98567d"
-  flavor_id       = "2"
-  key_pair        = "id_cybera_openstack"
-  security_groups = ["default","ssh","ping"]
-  user_data = "${var.cloudconfig_default_user}"
-  network {
-    name = "k8s-network"
-    fixed_ip_v4 = "192.168.180.91"
-  }
-}
-
-resource "openstack_compute_instance_v2" "node1" {
-  name            = "node1"
-  image_id        = "10076751-ace0-49b2-ba10-cfa22a98567d"
-  flavor_id       = "2"
-  key_pair        = "id_cybera_openstack"
-  security_groups = ["default","ssh","ping"]
-  user_data = "${var.cloudconfig_default_user}"
-  network {
-    name = "k8s-network"
-    fixed_ip_v4 = "192.168.180.93"
-  }
-}
-
-output "ip" {
-  value = "${openstack_networking_floatingip_v2.fip_1.address}"
-  value = "${openstack_networking_floatingip_v2.fip_2.address}"
-}
+  $ terraform plan
+  $ terraform apply
 ```
 
-Along with the corresponding variables.tf
-```
-variable "os_cybera_password" {}
-variable "os_cybera" {
-  type="map"
-  default = {
-    "user_name" = "ifallison@gmail.com"
-    "project_name" = "jupyter-dev"
-    "tenant_name" = "jupyter-dev"
-    "tenant_id" = "d22d1e3f28be45209ba8f660295c84cf"
-    "auth_url" = "https://keystone-yyc.cloud.cybera.ca:5000/v2.0"
-    "region" = "Calgary"
-  }
-}
+Terraform will create the resources defined in k8s-syzygy.tf and report back the
+floating IP of the master node. Assign a name for this in DNS (e.g.
+k8s1.syzygy.ca)
 
-variable "cloudconfig_default_user" {
-  type = "string"
-  default = <<EOF
-#cloud-config
-system_info:
-  default_user:
-    name: ptty2u
-EOF
-}
-```
-
-This config should be able to use TF_VAR_os_cybera_password environment
-variable to retrieve the password
+### Ansible
 
 Once the machines are deployed we need to take care of some initialization
 tasks, most of the can be done via ansible, but we will want an inventory. The
 inventory *should* be generated automatically as in the
-contrib/terrafor/openstack setup, but that isn't configured yet, so here is a
-sample 
+contrib/terraform/openstack setup, but that isn't configured yet, so here is a
+sample (my_inventory/inventory.ini)
 
 ```
-# ## Configure 'ip' variable to bind kubernetes services on a
-# ## different ip than the default iface
-manager1 ansible_ssh_host=192.168.180.90
-manager2 ansible_ssh_host=192.168.180.91
-node1    ansible_ssh_host=192.168.180.93
-# node4 ansible_ssh_host=95.54.0.15  # ip=10.3.0.4
-# node5 ansible_ssh_host=95.54.0.16  # ip=10.3.0.5
-# node6 ansible_ssh_host=95.54.0.17  # ip=10.3.0.6
-
-# ## configure a bastion host if your nodes are not directly reachable
-# bastion ansible_ssh_host=162.246.156.163
+manager1 ansible_ssh_host=10.0.0.16
+node1    ansible_ssh_host=10.0.0.18
+node2    ansible_ssh_host=10.0.0.17
 
 [kube-master]
 manager1
-manager2
 
 [etcd]
 manager1
-manager2
 node1
+node2
 
 [kube-node]
 manager1
-manager2
 node1
+node2
 
 [k8s-cluster:children]
 kube-node
 kube-master
 ```
 
-Then take care of some prelim tasks
+I tend to add the local IP addresses to .ssh/config as bastien ssh clients
+```
+# kubernetes on CC
+Host 10.0.0.*
+    User ptty2u
+    ProxyCommand ssh -l ptty2u k8s1.syzygy.ca -W %h:%p
+    IdentityFile ~/.ssh/id_cc_openstack
+    StrictHostKeyChecking no
+```
 
-  * sudo requiretty
-  * yum update (exclude dhclient and dhpc*)
-  * rm /etc/motd
-  * disable host firewalls (probably the default)
-  * turn swap off
+Now run ansible to update the hosts
+```
+  $ ansible -i my_inventory/inventory.ini -b -m command -a 'w' all
+  $ ansible -i my_inventory/inventory.ini -b -m yum -a 'name=* state=latest' all
+  $ ansible -i my_inventory/inventory.ini -b -m command -a 'reboot' all
+```
+
+
+## kubespray
+
+### Deploy
+If all has gone well, deploy from the kubespray directory with something like
+```
+$ ansible-playbook -i inventory/inventory.ini cluster.yml -b -v
+```
+
+The deploy can run for quite a ong time (10-15 minutes) and will report status
+for each of the tasks defined in the kubespray playbooks. When it is finished,
+log in to the master node and check the cluster status
+
+```
+ $ kubectl config view
+apiVersion: v1
+clusters:
+- cluster:
+    certificate-authority-data: REDACTED
+    server: https://10.0.0.16:6443
+  name: cluster.local
+contexts:
+- context:
+    cluster: cluster.local
+    user: admin-cluster.local
+  name: admin-cluster.local
+current-context: admin-cluster.local
+kind: Config
+preferences: {}
+users:
+- name: admin-cluster.local
+  user:
+    client-certificate-data: REDACTED
+    client-key-data: REDACTED
+
+  $ kubectl get nodes
+NAME      STATUS    ROLES         AGE       VERSION
+master1   Ready     master,node   7m        v1.8.4+coreos.0
+node1     Ready     node          7m        v1.8.4+coreos.0
+node2     Ready     node          7m        v1.8.4+coreos.0
+```
+
+If things are showing as ready, proceed with testing out the kubernetes
+deployment.
+
+## Other notes
+
+The notes below this point may not be relevant, they mostly relate to problems
+we've seen on other installations.
 
 ### Openstack
 
@@ -244,25 +146,6 @@ Set the gateway network, N.B. I had to ask one of the cluster admins to do this
 for me because it pulls an IP out of their limited pool.
 ```
   $ neutron router-gateway-set k8s-router external_network
-```
-
-## SSH/Access
-I've defined a private network for these hosts (192.168.180.0/24) which isn't
-routable so we will use one of the manager nodes as a bastien host for connecting
-```
-  $ vi ~/.ssh/config
-...
-Host 192.168.180.*
-    User ptty2u
-    ProxyCommand ssh -l ptty2u 162.246.156.163 -W %h:%p 
-    IdentityFile ~/.ssh/id_cybera_openstack
-    StrictHostKeyChecking no
-```
-
-### Deploy
-If all has gone well, deploy from the kubespray directory with something like
-```
-$ ansible-playbook -i inventory/inventory.ini cluster.yml -b -v
 ```
 
 ### Gluster
@@ -289,5 +172,3 @@ our terraform state.)
 ansible-playbook -b --become-user=root --user=ptty2u -i
 ../my_inventory/inventory.ini ./contrib/network-storage/glusterfs/glusterfs.yml
 ```
-
-
