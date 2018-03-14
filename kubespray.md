@@ -4,8 +4,11 @@ Starting from a new project definition on cybera's RAC
 ### Python / Ansible / Terraform
 Download an up to date RC file from the project overview page and source it so
 that we can authenticate to the openstack API. Terraform will need a few extra
-variables as well.
+variables as well. The file below sort of works, to do this. It expects to find
+a file called cc.gpg in the same directory which should consist of a single line
+with the username and password in the form "username:password".
 
+There are some hard coded paths which should probably be improved or removed.
 ```
 #!/usr/bin/env bash
 
@@ -20,12 +23,12 @@ variables as well.
 # OpenStack API is version 2.0. For example, your cloud provider may implement
 # Image API v1.1, Block Storage API v2, and Compute API v2.0. OS_AUTH_URL is
 # only for the Identity API served through keystone.
-export OS_AUTH_URL=https://keystone-yyc.cloud.cybera.ca:5000/v2.0
+export OS_AUTH_URL=https://west.cloud.computecanada.ca:5000/v2.0
 
 # With the addition of Keystone we have standardized on the term **tenant**
 # as the entity that owns the resources.
-export OS_TENANT_ID=d22d1e3f28be45209ba8f660295c84cf
-export OS_TENANT_NAME="jupyter-dev"
+export OS_TENANT_ID=9f627f6d145f43f384c9b75c4cab207d
+export OS_TENANT_NAME="ipm-500"
 
 # unsetting v3 items in case set
 unset OS_PROJECT_ID
@@ -33,20 +36,17 @@ unset OS_PROJECT_NAME
 unset OS_USER_DOMAIN_NAME
 unset OS_INTERFACE
 
-# In addition to the owning entity (tenant), OpenStack stores the entity
-# performing the action as the **user**.
-export OS_USERNAME="ifallison@gmail.com"
 
 # If your configuration has multiple regions, we set that information here.
 # OS_REGION_NAME is optional and only valid in certain environments.
-export OS_REGION_NAME="Calgary"
+export OS_REGION_NAME="regionOne"
 # Don't leave a blank variable, unset it if it was empty
 if [ -z "$OS_REGION_NAME" ]; then unset OS_REGION_NAME; fi
 
 export OS_ENDPOINT_TYPE=publicURL
 export OS_IDENTITY_API_VERSION=2
 
-KEYFILE="./cybera.gpg" 
+KEYFILE="./cc.gpg" 
 if [ -x "/usr/bin/gpg2" ] ; then
     GPG2="/usr/bin/gpg2"
 elif [ -x "/usr/local/bin/gpg2" ] ; then
@@ -54,13 +54,18 @@ elif [ -x "/usr/local/bin/gpg2" ] ; then
 else
     echo "Can't find GPG2, not setting OS_PASSWORD"
 fi
-OS_PASSWORD=$(${GPG2} -d ${KEYFILE})
+OS_AUTH=$(${GPG2} -d ${KEYFILE})
+OS_USERNAME=$(/bin/echo $OS_AUTH | /usr/bin/cut -f1 -d:)
+OS_PASSWORD=$(/bin/echo $OS_AUTH | /usr/bin/cut -f2 -d:)
+export OS_USERNAME
 export OS_PASSWORD
 
 
 export TF_VAR_os_cybera_password=${OS_PASSWORD}
 ulimit -n 1024
 clear
+
+
 ```
 Source all of the above
 ```
