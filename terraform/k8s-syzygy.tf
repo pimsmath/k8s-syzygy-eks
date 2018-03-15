@@ -7,6 +7,21 @@ provider "openstack" {
   region       = "${var.os_region_name}"
 }
 
+resource "openstack_blockstorage_volume_v2" "gvol1" {
+  name = "gvol1"
+  size = 5
+}
+
+resource "openstack_blockstorage_volume_v2" "gvol2" {
+  name = "gvol2"
+  size = 5
+}
+
+resource "openstack_blockstorage_volume_v2" "gvol3" {
+  name = "gvol3"
+  size = 5
+}
+
 resource "openstack_compute_secgroup_v2" "ssh" {
   name        = "ssh"
   description = "ssh access"
@@ -38,6 +53,21 @@ resource "openstack_networking_floatingip_v2" "fip_1" {
 resource "openstack_compute_floatingip_associate_v2" "fip_1" {
   floating_ip = "${openstack_networking_floatingip_v2.fip_1.address}"
   instance_id = "${openstack_compute_instance_v2.master1.id}"
+}
+
+resource "openstack_compute_volume_attach_v2" "gvol1" {
+  instance_id = "${openstack_compute_instance_v2.master1.id}"
+  volume_id = "${openstack_blockstorage_volume_v2.gvol1.id}"
+}
+
+resource "openstack_compute_volume_attach_v2" "gvol2" {
+  instance_id = "${openstack_compute_instance_v2.node1.id}"
+  volume_id = "${openstack_blockstorage_volume_v2.gvol2.id}"
+}
+
+resource "openstack_compute_volume_attach_v2" "gvol3" {
+  instance_id = "${openstack_compute_instance_v2.node2.id}"
+  volume_id = "${openstack_blockstorage_volume_v2.gvol3.id}"
 }
 
 resource "openstack_compute_instance_v2" "master1" {
