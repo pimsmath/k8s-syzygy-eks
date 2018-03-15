@@ -179,3 +179,17 @@ our terraform state.)
 ansible-playbook -b --become-user=root --user=ptty2u -i
 ../my_inventory/inventory.ini ./contrib/network-storage/glusterfs/glusterfs.yml
 ```
+
+Once it is running, you should be able to create, use and destroy gluster
+volumes
+```
+ manager1$ gluster volume create test replica 3 transport tcp 10.0.0.16:/mnt/xfs-drive-gluster/volume1 10.0.0.18:/mnt/xfs-drive-gluster/volume1 10.0.0.17:/mnt/xfs-drive-gluster/volume1
+ manager1$ gluster volume start
+ manager1$ mkdir /tmp/gluster
+ manager1$ mount -t glusterfs 10.0.0.16:test /tmp/gluster
+ manager1$ touch /mnt/gluster/file
+ node1$ mkdir /tmp/gluster
+ node1$ mount -t glusterfs 10.0.0.18:test /tmp/gluster
+ node1$ ls /tmp/gluster
+ file
+ ```
