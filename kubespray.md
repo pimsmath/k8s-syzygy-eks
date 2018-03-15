@@ -192,4 +192,9 @@ volumes
  node1$ mount -t glusterfs 10.0.0.18:test /tmp/gluster
  node1$ ls /tmp/gluster
  file
+ 
+ node1$ umount /tmp/gluster
+ manager1$ umount /tmp/gluster
+ manager1$ gluster volume stop test
+ manager1$ gluster volume delete test
  ```
