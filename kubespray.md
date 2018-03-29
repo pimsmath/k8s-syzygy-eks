@@ -36,33 +36,60 @@ k8s1.syzygy.ca)
 Once the machines are deployed we need to take care of some initialization
 tasks, most of the can be done via ansible, but we will want an inventory. The
 inventory *should* be generated automatically as in the
-contrib/terraform/openstack setup, but that isn't configured yet, so here is a
-sample (my_inventory/inventory.ini)
+contrib/terraform/openstack setup, but that isn't configured yet, so follow the
+instructions on the [kubespray
+README.md](https://github.com/kubernetes-incubator/kubespray/blob/master/README.md)
 
 ```
-manager1 ansible_ssh_host=10.0.0.16
-node1    ansible_ssh_host=10.0.0.18
-node2    ansible_ssh_host=10.0.0.17
+$ cd kubespray
+$ cp -rpf inventory/sample inventory/mycluster
+$ declare -a IPS=(10.0.0.172 10.0.0.171 10.0.0.170)
+$ CONFIG_FILE=inventory/mycluster/hosts.ini python3
+  contrib/inventory_builder/inventory.py ${IPS[@]}
+
+$ vi inventory/mycluster/group_vars/all.yml
+ +bootstrap_os: centos
+
+$ vi inventory/mycluster/hosts.ini
+[all]
+master1 	 ansible_host=10.0.0.172 ip=10.0.0.172
+node1 	 ansible_host=10.0.0.171 ip=10.0.0.171
+node2 	 ansible_host=10.0.0.170 ip=10.0.0.170
 
 [kube-master]
-manager1
+master1
 
-[etcd]
-manager1
+[kube-node]
+master1
 node1
 node2
 
-[kube-node]
-manager1
+[etcd]
+master1
 node1
 node2
 
 [k8s-cluster:children]
 kube-node
 kube-master
+
+[calico-rr]
+
+[vault]
+master1
+node1
+node2
+
++[gfs-cluster]
++master1 disk_volume_device_1=/dev/vdc
++node1   disk_volume_device_1=/dev/vdc
++node2   disk_volume_device_1=/dev/vdc
+
++[network-storage:children]
++gfs-cluster
 ```
 
-I tend to add the local IP addresses to .ssh/config as bastien ssh clients
+Add the local IP addresses to .ssh/config as bastien ssh clients
 ```
 # kubernetes on CC
 Host 10.0.0.*
@@ -74,17 +101,15 @@ Host 10.0.0.*
 
 Now run ansible to update the hosts
 ```
-  $ cd ansible
-  $ ansible -i ./inventory.ini -b -m command -a 'w' all
-  $ ansible -i ./inventory.ini -b -m yum -a 'name=* state=latest' all
-  $ ansible -i ./inventory.ini -b -m command -a 'reboot' all
+  $ ansible -i ./inventory/mycluster/hosts.ini -b -m command -a 'w' all
+  $ ansible -i ./inventory/mycluster/hosts.ini -b -m yum -a 'name=* state=latest' all
+  $ ansible -i ./inventory/mycluster/hosts.ini -b -m command -a 'reboot' all
 ```
 
 There is also a playbook to update ssh keys and perform some other housekeeping
 tasks
 ``` 
-  $ cd ansible
-  $ ansible-playbook plays/k8s.yml
+  $ ansible-playbook -i ./inventory/mycluster/hosts.ini ansible/plays/k8s.yml
 ```
 
 ## kubespray
@@ -95,7 +120,7 @@ If all has gone well, deploy from the kubespray directory with something like
 $ ansible-playbook -i inventory/inventory.ini cluster.yml -b -v
 ```
 
-The deploy can run for quite a ong time (10-15 minutes) and will report status
+The deploy can run for quite a long time (10-15 minutes) and will report status
 for each of the tasks defined in the kubespray playbooks. When it is finished,
 log in to the master node and check the cluster status
 
@@ -131,30 +156,6 @@ node2     Ready     node          7m        v1.8.4+coreos.0
 If things are showing as ready, proceed with testing out the kubernetes
 deployment.
 
-## Other notes
-
-The notes below this point may not be relevant, they mostly relate to problems
-we've seen on other installations.
-
-### Openstack
-
-We assume that you have a project available inside openstack. There is some
-preliminary setup required for the network (see the [kubespray-cli
-README](https://github.com/kubespray/kubespray-cli).
-```
-  $ neutron net-create k8s-network
-  $ neutron subnet-create --name k8s-subnet --dns-nameserver 8.8.8.8
-  --enable-dhcp --allocation_pool "start=192.168.180.100,end=192.168.180.200"
-  k8s-network 192.168.180.0/24
-  $ neutron router-create k8s-router
-```
-
-Set the gateway network, N.B. I had to ask one of the cluster admins to do this
-for me because it pulls an IP out of their limited pool.
-```
-  $ neutron router-gateway-set k8s-router external_network
-```
-
 ### Gluster
 
 It might be necessary to add distributed storage to the cluster for some
@@ -180,6 +181,9 @@ ansible-playbook -b --become-user=root --user=ptty2u -i
 ../my_inventory/inventory.ini ./contrib/network-storage/glusterfs/glusterfs.yml
 ```
 
+If you get errors with out of date IP addresses, try adding `--flush-cache` to
+remove the facts cached by ansible.
+
 Once it is running, you should be able to create, use and destroy gluster
 volumes
 ```
@@ -198,3 +202,29 @@ volumes
  manager1$ gluster volume stop test
  manager1$ gluster volume delete test
  ```
+
+
+## Other notes
+
+The notes below this point may not be relevant, they mostly relate to problems
+we've seen on other installations.
+
+### Openstack
+
+We assume that you have a project available inside openstack. There is some
+preliminary setup required for the network (see the [kubespray-cli
+README](https://github.com/kubespray/kubespray-cli).
+```
+  $ neutron net-create k8s-network
+  $ neutron subnet-create --name k8s-subnet --dns-nameserver 8.8.8.8
+  --enable-dhcp --allocation_pool "start=192.168.180.100,end=192.168.180.200"
+  k8s-network 192.168.180.0/24
+  $ neutron router-create k8s-router
+```
+
+Set the gateway network, N.B. I had to ask one of the cluster admins to do this
+for me because it pulls an IP out of their limited pool.
+```
+  $ neutron router-gateway-set k8s-router external_network
+```
+

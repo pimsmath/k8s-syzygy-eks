@@ -9,21 +9,21 @@ provider "openstack" {
 
 resource "openstack_blockstorage_volume_v2" "gvol1" {
   name = "gvol1"
-  size = 5
+  size = 50
 }
 
 resource "openstack_blockstorage_volume_v2" "gvol2" {
   name = "gvol2"
-  size = 5
+  size = 50
 }
 
 resource "openstack_blockstorage_volume_v2" "gvol3" {
   name = "gvol3"
-  size = 5
+  size = 50
 }
 
-resource "openstack_compute_secgroup_v2" "ssh" {
-  name        = "ssh"
+resource "openstack_compute_secgroup_v2" "ssh-tf" {
+  name        = "ssh-tf"
   description = "ssh access"
 
   rule {
@@ -34,8 +34,8 @@ resource "openstack_compute_secgroup_v2" "ssh" {
   }
 }
 
-resource "openstack_compute_secgroup_v2" "ping" {
-  name        = "ping"
+resource "openstack_compute_secgroup_v2" "ping-tf" {
+  name        = "ping-tf"
   description = "ICMP traffic"
 
   rule {
@@ -47,7 +47,7 @@ resource "openstack_compute_secgroup_v2" "ping" {
 }
 
 resource "openstack_networking_floatingip_v2" "fip_1" {
-  pool = "VLAN3337"
+  pool = "${var.os_external_network}"
 }
 
 resource "openstack_compute_floatingip_associate_v2" "fip_1" {
@@ -75,7 +75,7 @@ resource "openstack_compute_instance_v2" "master1" {
   image_id        = "${var.os_image_id}"
   flavor_id       = "${var.os_flavor_id}"
   key_pair        = "${var.os_ssh_key}"
-  security_groups = ["default", "ssh", "ping"]
+  security_groups = ["default", "ssh-tf", "ping-tf"]
   user_data = "${var.cloudconfig_default_user}"
   network {
     name = "${var.os_default_network}"
@@ -87,7 +87,7 @@ resource "openstack_compute_instance_v2" "node1" {
   image_id        = "${var.os_image_id}"
   flavor_id       = "${var.os_flavor_id}"
   key_pair        = "${var.os_ssh_key}"
-  security_groups = ["default", "ssh", "ping"]
+  security_groups = ["default", "ssh-tf", "ping-tf"]
   user_data = "${var.cloudconfig_default_user}"
   network {
     name = "${var.os_default_network}"
@@ -99,7 +99,7 @@ resource "openstack_compute_instance_v2" "node2" {
   image_id        = "${var.os_image_id}"
   flavor_id       = "${var.os_flavor_id}"
   key_pair        = "${var.os_ssh_key}"
-  security_groups = ["default", "ssh", "ping"]
+  security_groups = ["default", "ssh-tf", "ping-tf"]
   user_data = "${var.cloudconfig_default_user}"
   network {
     name = "${var.os_default_network}"
