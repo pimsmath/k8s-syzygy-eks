@@ -9,3 +9,4 @@
     - { role: ssh-public-keys,             tags: ["setup", "ssh"] }
     - { role: ansible-sudo,                tags: ["setup", "sudo"] }
     - { role: ansible-sshd,                tags: ["setup", "sshd"] }
+    - { role: elrepo-kernel,               tags: ["kernek"] }

@@ -1,0 +1,8 @@
+---
+elrepo_repo_url: "http://www.elrepo.org/elrepo-release-7.0-3.el{{ ansible_distribution_major_version }}.elrepo.noarch.rpm"
+elrepo_repo_gpg_key_url: "https://www.elrepo.org/RPM-GPG-KEY-elrepo.org"
+elrepo_repofile_path: "/etc/yum.repos.d/elrepo.repo"
+elrepo_kernel_repo: "elrepo-kernel"
+elrepo_kernel_packages:
+  - { name: 'kernel-lt', state: 'latest' }
+  - { name: 'kernel-lt-devel', state: 'latest' }

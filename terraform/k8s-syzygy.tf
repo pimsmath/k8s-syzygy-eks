@@ -12,13 +12,28 @@ resource "openstack_blockstorage_volume_v2" "gvol1" {
   size = 50
 }
 
+resource "openstack_blockstorage_volume_v2" "dvol1" {
+  name = "dvol1"
+  size = 50
+}
+
 resource "openstack_blockstorage_volume_v2" "gvol2" {
   name = "gvol2"
   size = 50
 }
 
+resource "openstack_blockstorage_volume_v2" "dvol2" {
+  name = "dvol2"
+  size = 50
+}
+
 resource "openstack_blockstorage_volume_v2" "gvol3" {
   name = "gvol3"
+  size = 50
+}
+
+resource "openstack_blockstorage_volume_v2" "dvol3" {
+  name = "dvol3"
   size = 50
 }
 
@@ -60,14 +75,29 @@ resource "openstack_compute_volume_attach_v2" "gvol1" {
   volume_id = "${openstack_blockstorage_volume_v2.gvol1.id}"
 }
 
+resource "openstack_compute_volume_attach_v2" "dvol1" {
+  instance_id = "${openstack_compute_instance_v2.master1.id}"
+  volume_id = "${openstack_blockstorage_volume_v2.dvol1.id}"
+}
+
 resource "openstack_compute_volume_attach_v2" "gvol2" {
   instance_id = "${openstack_compute_instance_v2.node1.id}"
   volume_id = "${openstack_blockstorage_volume_v2.gvol2.id}"
 }
 
+resource "openstack_compute_volume_attach_v2" "dvol2" {
+  instance_id = "${openstack_compute_instance_v2.node1.id}"
+  volume_id = "${openstack_blockstorage_volume_v2.dvol2.id}"
+}
+
 resource "openstack_compute_volume_attach_v2" "gvol3" {
   instance_id = "${openstack_compute_instance_v2.node2.id}"
   volume_id = "${openstack_blockstorage_volume_v2.gvol3.id}"
+}
+
+resource "openstack_compute_volume_attach_v2" "dvol3" {
+  instance_id = "${openstack_compute_instance_v2.node2.id}"
+  volume_id = "${openstack_blockstorage_volume_v2.dvol3.id}"
 }
 
 resource "openstack_compute_instance_v2" "master1" {
