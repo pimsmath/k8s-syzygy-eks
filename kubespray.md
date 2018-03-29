@@ -1,4 +1,4 @@
-Starting from a new project definition on ComputeCanada's west cloud
+Starting from a new project definition on an OpenStack installation
 
 ## Prerequisites
 ### Python / Ansible / Terraform
@@ -9,18 +9,19 @@ will look for openrc.sh with the correct variables for project etc. and will
 prompt you for your openstack credentials
 
 ```
-  . init.sh
+  . init.sh cybera
 ```
 
 ### Terraform
 
 Terraform is used to define 3 VMs running CentOS 7 on a smallish flavour. The
-variables.tf file defines defaults for some standard variables and these can be
-overriden by setting the corresponding environment variable (e.g.
+variables.tf file defines defaults for some standard variables which can be
+overridden by setting the corresponding environment variable (e.g.
 TF_VAR_os_password). If you have sourced the init.sh script above then you
-should be ready to go. In most cases you can just run `terraform plan` to see
-what actions will be taken, but you may need to run `terraform init` to grab the
-openstack plugin (running terraform plan should inform you if that is the case).
+should be ready to go. In most cases you can just change to the terraform
+directory and run `terraform plan` to see what actions will be taken, but you
+may need to run `terraform init` to grab the openstack plugin (running terraform
+plan should inform you if that is the case).
 
 ```
   $ terraform plan
@@ -35,10 +36,10 @@ k8s1.syzygy.ca)
 
 Once the machines are deployed we need to take care of some initialization
 tasks, most of the can be done via ansible, but we will want an inventory. The
-inventory *should* be generated automatically as in the
-contrib/terraform/openstack setup, but that isn't configured yet, so follow the
-instructions on the [kubespray
-README.md](https://github.com/kubernetes-incubator/kubespray/blob/master/README.md)
+inventory construction process is described on the [kubespray
+README.md](https://github.com/kubernetes-incubator/kubespray/blob/master/README.md).
+Following that you should have an inventory in inventory/mycluster along with
+some configuration variables.
 
 ```
 $ cd kubespray
@@ -49,6 +50,9 @@ $ CONFIG_FILE=inventory/mycluster/hosts.ini python3
 
 $ vi inventory/mycluster/group_vars/all.yml
  +bootstrap_os: centos
+
+$ vi inventory/mycluster/group_vars/k8s-cluster.yml
+ +kube_network_plugin: flannel
 
 $ vi inventory/mycluster/hosts.ini
 [all]
@@ -110,14 +114,27 @@ There is also a playbook to update ssh keys and perform some other housekeeping
 tasks
 ``` 
   $ ansible-playbook -i ./inventory/mycluster/hosts.ini ansible/plays/k8s.yml
+  $ ansible -i ./inventory/mycluster/hosts.ini -b -m command -a 'reboot' all
 ```
+The final reboot is needed to pick up the new kernel installed in the k8s.yml
+playbook.
 
 ## kubespray
 
 ### Deploy
-If all has gone well, deploy from the kubespray directory with something like
+Our kubespray deployment is fairly vanilla, but since we've had problems with
+the docker storage backend we will use overlay2 (we have a 4.4 kernel). Be
+CAREFUL to use the right device in the config file below.
+
 ```
-$ ansible-playbook -i inventory/inventory.ini cluster.yml -b -v
+  $ vi ./inventory/mycluster/group_vars/docker-storage.yml
+---
+docker_container_storage_setup_version: v0.6.0
+docker_container_storage_setup_profile_name: kubespray
+docker_container_storage_setup_storage_driver: overlay2
+docker_container_storage_setup_devs: /dev/sdb
+
+  $ ansible-playbook -i inventory/inventory.ini cluster.yml -b -v
 ```
 
 The deploy can run for quite a long time (10-15 minutes) and will report status
@@ -130,7 +147,7 @@ apiVersion: v1
 clusters:
 - cluster:
     certificate-authority-data: REDACTED
-    server: https://10.0.0.16:6443
+    server: https://192.168.180.117:6443
   name: cluster.local
 contexts:
 - context:
@@ -148,9 +165,9 @@ users:
 
   $ kubectl get nodes
 NAME      STATUS    ROLES         AGE       VERSION
-master1   Ready     master,node   7m        v1.8.4+coreos.0
-node1     Ready     node          7m        v1.8.4+coreos.0
-node2     Ready     node          7m        v1.8.4+coreos.0
+master1   Ready     master,node   2m        v1.9.5+coreos.0
+node1     Ready     node          2m        v1.9.5+coreos.0
+node2     Ready     node          2m        v1.9.5+coreos.0
 ```
 
 If things are showing as ready, proceed with testing out the kubernetes
