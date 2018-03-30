@@ -1,0 +1,32 @@
+---
+- name: Install Heketi server package
+  yum: name="heketi"  state=present
+  with_items:
+    - "heketi"
+    - "heketi-client"
+
+- name: Create a new ssh key
+  shell: ssh-keygen -f /etc/heketi/heketi_key.pub -t rsa -N ''
+  args:
+    creates: /etc/heketi/heketi_key.pub
+
+- name: Update key permissions
+  file:
+    path: {{ item }}
+    owner: 'heketi'
+    group: 'heketi'
+  with_items:
+    - "/etc/heketi/heketi_key"
+    - "/etc/heketi/heketi_key.pub"
+
+- name: Retrieve Heketi public key
+  shell: cat /etc/heketi/heketi_key.pub
+  register: heketi_public_key
+  changed_when: false
+
+- name: Update Heketi config file
+  template:
+    src: heketi.json.j2
+    dest: /etc/heketi/heketi.json
+    owner: root
+    group: heketi

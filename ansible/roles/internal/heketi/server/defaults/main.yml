@@ -1,0 +1,5 @@
+---
+heketi_config_file: "/etc/heketi/heketi.json"
+heketi_ssh_public_key: "/etc/heketi/heketi_key.pub"
+heketi_ssh_private_key: "/etc/heketi/heketi_key"
+heketi_port: "8080"

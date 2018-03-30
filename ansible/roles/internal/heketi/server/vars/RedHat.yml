@@ -1,0 +1,3 @@
+---
+heketi_daemon: "heketi"
+heketi_ssh_user: "heketi"
