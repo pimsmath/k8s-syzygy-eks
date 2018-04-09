@@ -32,11 +32,11 @@
 
     "_sshexec_comment": "SSH username and private key file information",
     "sshexec": {
-      "keyfile": "{{ heketi_ssh_privat_key }}",
+      "keyfile": "{{ heketi_ssh_private_key_file }}",
       "user": "{{ heketi_ssh_user }}",
       "port": "22",
       "fstab": "/etc/fstab",
-      "sudo": "true"
+      "sudo": true
     },
 
     "_kubeexec_comment": "Kubernetes configuration",

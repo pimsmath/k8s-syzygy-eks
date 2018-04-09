@@ -1,0 +1,18 @@
+---
+- hosts: gfs-cluster
+  gather_facts: false
+  vars:
+    ansible_ssh_pipelining: false
+
+- hosts: all
+  gather_facts: true
+
+- hosts: heketi-server
+  vars:
+    ansible_ssh_pipelining: true
+  roles:
+    - { role: heketi/server }
+
+- hosts: k8s-cluster
+  roles:
+    - { role: heketi/client }

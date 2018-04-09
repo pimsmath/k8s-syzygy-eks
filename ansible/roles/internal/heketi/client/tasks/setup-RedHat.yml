@@ -1,0 +1,3 @@
+---
+- name: Install Heketi client package
+  yum: name="{{ heketi_client_package }}"  state=present
