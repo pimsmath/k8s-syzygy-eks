@@ -24,3 +24,4 @@
     ansible_ssh_pipelining: true
   roles:
     - { role: heketi/cluster }
+    - { role: k8s-storageclass }

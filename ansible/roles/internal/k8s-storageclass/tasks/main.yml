@@ -1,0 +1,7 @@
+---
+- name: Add k8s default storage class for heketi
+  template:
+    src: k8s-storageclass.yml.j2
+    dest: /etc/heketi/k8s-storageclass.yml
+  notify:
+    - Add k8s heketi storageclass
