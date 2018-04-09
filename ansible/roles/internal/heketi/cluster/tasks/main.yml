@@ -1,0 +1,10 @@
+---
+- name: Define topology
+  template:
+    src: topology.json.j2
+    dest: /etc/heketi/topology.json
+    owner: '{{ heketi_user }}'
+    group: '{{ heketi_user }}'
+  notify:
+    - Apply heketi topology
+

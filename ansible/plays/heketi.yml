@@ -13,6 +13,14 @@
   roles:
     - { role: heketi/server }
 
-- hosts: k8s-cluster
+- hosts: heketi-cluster
+  vars:
+    ansible_ssh_pipelining: true
   roles:
     - { role: heketi/client }
+
+- hosts: heketi-server
+  vars:
+    ansible_ssh_pipelining: true
+  roles:
+    - { role: heketi/cluster }

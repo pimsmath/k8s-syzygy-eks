@@ -1,0 +1,3 @@
+---
+- name: Apply heketi topology
+  command: heketi-cli -s "http://{{ heketi_server }}:{{ heketi_server_port}}" topology load --json /etc/heketi/topology.json
