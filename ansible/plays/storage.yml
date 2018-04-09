@@ -1,0 +1,37 @@
+---
+- hosts: gfs-cluster
+  gather_facts: false
+  vars:
+    ansible_ssh_pipelining: false
+
+- hosts: all
+  gather_facts: true
+
+- hosts: gfs-cluster
+  vars:
+    ansible_ssh_pipelining: true
+  roles:
+    - { role: glusterfs/server }
+
+- hosts: k8s-cluster
+  roles:
+    - { role: glusterfs/client }
+
+- hosts: heketi-server
+  vars:
+    ansible_ssh_pipelining: true
+  roles:
+    - { role: heketi/server }
+
+- hosts: heketi-cluster
+  vars:
+    ansible_ssh_pipelining: true
+  roles:
+    - { role: heketi/client }
+
+- hosts: heketi-server
+  vars:
+    ansible_ssh_pipelining: true
+  roles:
+    - { role: heketi/cluster }
+    - { role: k8s-storageclass }
