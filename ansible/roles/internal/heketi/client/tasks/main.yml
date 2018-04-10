@@ -27,7 +27,7 @@
 
 - name: Update User Environment
   become: true
-  become_user: '{{ heketi_user }}'
+  become_user: "{{ heketi_ssh_user }}"
   lineinfile:
     path: "~/.bash_profile"
     regexp: '^export HEKETI_CLI_SERVER'

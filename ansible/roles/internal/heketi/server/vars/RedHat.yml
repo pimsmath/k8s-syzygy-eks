@@ -1,6 +1,4 @@
 ---
 heketi_daemon: "heketi"
 heketi_daemon_package: "heketi"
-heketi_user: "heketi"
-heketi_ssh_user: "{{ heketi_user }}"
 heketi_client_package: "heketi-client"

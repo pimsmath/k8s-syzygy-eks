@@ -1,3 +1,3 @@
 ---
-heketi_ssh_user:  "{{ ansible_user }}"
+heketi_ssh_user: 'ptty2u'
 heketi_server_port: "8880"
