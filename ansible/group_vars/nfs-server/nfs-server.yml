@@ -1,0 +1,6 @@
+---
+nfs_disk: /dev/sdc
+nfs_disk_mount_point: /export
+nfs_exports:
+  - '{{ nfs_disk_mount_point }} *(rw,sync,no_root_squash)'
+

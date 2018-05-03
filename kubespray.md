@@ -45,23 +45,26 @@ some configuration variables.
 $ cd kubespray
 $ cp -rpf inventory/sample inventory/mycluster
 # Check the IPS via openstack GUI or CLI
-$ declare -a IPS=(10.0.0.172 10.0.0.171 10.0.0.170)
+$ declare -a IPS=(192.168.180.126 192.168.180.124 192.168.180.125)
 $ CONFIG_FILE=inventory/mycluster/hosts.ini python3
   contrib/inventory_builder/inventory.py ${IPS[@]}
+```
 
-$ vi inventory/mycluster/group_vars/all.yml
- +bootstrap_os: centos
+We've decided to try NFS as a distributed storage provider so we modify the
+inventory to identify an nfs-server. This server will be provisioned as part of
+the plays/init.yml playbook.
 
-$ vi inventory/mycluster/group_vars/k8s-cluster.yml
- +kube_network_plugin: flannel
-
+```
 $ vi inventory/mycluster/hosts.ini
 [all]
-master1 	 ansible_host=10.0.0.172 ip=10.0.0.172
-node1 	 ansible_host=10.0.0.171 ip=10.0.0.171
-node2 	 ansible_host=10.0.0.170 ip=10.0.0.170
+master1 	 ansible_host=192.168.180.126 ip=192.168.180.126
+node1 	 ansible_host=192.168.180.124 ip=192.168.180.124
+node2 	 ansible_host=192.168.180.125 ip=192.168.180.125
 
 [kube-master]
+master1
+
+[nfs-server]
 master1
 
 [kube-node]
@@ -77,47 +80,33 @@ node2
 [k8s-cluster:children]
 kube-node
 kube-master
+```
 
-[vault]
-master1
-node1
-node2
+Set the OS and an overlay networking provider.
+```
+$ vi inventory/mycluster/group_vars/all.yml
+ +bootstrap_os: centos
 
-+[gfs-cluster]
-+master1 disk_volume_device_1=/dev/vdc
-+node1   disk_volume_device_1=/dev/vdc
-+node2   disk_volume_device_1=/dev/vdc
-
-+[network-storage:children]
-+gfs-cluster
+$ vi inventory/mycluster/group_vars/k8s-cluster.yml
+ +kube_network_plugin: flannel
 ```
 
 Add the local IP addresses to .ssh/config as bastien ssh clients
 ```
 # kubernetes on CC
-Host 10.0.0.*
+Host 192.168.180.*
     User ptty2u
     ProxyCommand ssh -l ptty2u k8s1.syzygy.ca -W %h:%p
     IdentityFile ~/.ssh/id_cc_openstack
     StrictHostKeyChecking no
 ```
 
-Now run ansible to update the hosts
+Now run the init playbook to update the hosts (N.B. the kernel update will
+include a reboot task.
 ```
   $ cd ansible
-  $ ansible -i hosts.ini -b -m command -a 'w' all
-  $ ansible -i hosts.ini -b -m yum -a 'name=* state=latest' all
-  $ ansible -i hosts.ini -b -m command -a 'reboot' all
+  $ ansible-playbook -i hosts.ini  plays/init.yml
 ```
-
-There is also a playbook to update ssh keys and perform some other housekeeping
-tasks
-``` 
-  $ ansible-playbook -i hosts.ini plays/k8s.yml
-  $ ansible -i hosts.ini -b -m command -a 'reboot' all
-```
-The final reboot is needed to pick up the new kernel installed in the k8s.yml
-playbook.
 
 ## kubespray
 
@@ -172,14 +161,105 @@ node2     Ready     node          2m        v1.9.5+coreos.0
 ```
 
 ## Distributed Storage
-A lot of what kubernetes does relies on having distributed storage. There are
-various options, but for now, we will stick to glusterfs. On top of gluster, we
-use heketi as a service to allow kubernetes to control allocation and mangement
-of storage. 
+
+A lot of what kubernetes does relies on having distributed storage. The trick is
+that the storage has to be under kubernetes' direct control so that it can
+allocate/deallocate and otherwise manipulate volumes. The most common storage
+providers are the cloud based ones, (gcePersistentDisk, awsElasticBlockStore
+etc.) but nfs and gluster are also possible.
+
+### NFS
+
+In the hosts.ini above, we have listed an nfs-server so init.yaml should have
+partitioned a volume and configured /etc/exports on that machine. On top of the
+raw storage we need a provider to allow kubernetes to control volume
+lifecycling. We will use the nfs-client provisioner from the
+[kubernetes/external-storage](https://github.com/kubernetes-incubator/external-storage)
+project. On master1, clone out that repository.
+
+```
+ $ git clone https://github.com/kubernetes-incubator/external-storage
+```
+
+The kubespray installation uses RBAC so we need to follow the [instructions for
+authentication](https://github.com/kubernetes-incubator/external-storage/blob/master/nfs/docs/authorization.md).
+N.B. These instructions are actually for the nfs provider, the documentation for
+nfs-client is missing.
+```
+  $ cd external-storage/nfs-client/deploy/kubernetes
+  $ kubectl create -f auth/serviceaccount.yaml
+  
+  $ vi auth/clusterrole.yaml
+  - apiVersion: rbac.authorization.k8s.io/v1
+  + apiVersion: rbac.authorization.k8s.io/v1beta1
+  $ kubectl create -f auth/clusterrole.yaml
+
+  $ vi auth/clusterrole.yaml
+  - apiVersion: rbac.authorization.k8s.io/v1
+  + apiVersion: rbac.authorization.k8s.io/v1beta1
+  $ kubectl create -f auth/clusterrolebinding.yaml
+
+  $ vi deployment.yaml
+             - name: PROVISIONER_NAME
+               value: fuseim.pri/ifs
+             - name: NFS_SERVER
+-              value: 10.10.10.60
++              value: 192.168.180.126 # Check the IP address of your NFS server
+             - name: NFS_PATH
+-              value: /ifs/kubernetes
++              value: /export
+       volumes:
+         - name: nfs-client-root
+           nfs:
+-            server: 10.10.10.60
+-            path: /ifs/kubernetes
++            server: 192.168.180.126 # Check the IP address of your NFS server
++            path: /export
+
+
+  $ kubectl create -f deployment.yaml
+```
+
+Add a storageClass and make it the default
+```
+  $ vi class.yaml
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: managed-nfs-storage
+  annotations:
+    storageclass.beta.kubernetes.io/is-default-class: "true"
+provisioner: fuseim.pri/ifs # or choose another name, must match deployment's env PROVISIONER_NAME'
+
+  $ kubectl create -f class.yml
+```
+
+You should now be able to make PVCs and get a result
+```
+You should be able to see the nfs-client-provisioner pod come up.
+```
+  $ kubectl get pods
+NAME                                      READY     STATUS    RESTARTS   AGE
+nfs-client-provisioner-7c878d4d49-hf6gr   1/1       Running   0          1h
+```
+If you run into problems, check `kubect logs nfs-client...`
+
+
+### GlusterFS
+
+** This section has been deprecated in favour of NFS **
+
+GlusterFS is another option for distributed storage, and there is already some
+support for it in kubespray. Unfortunately we found that we had to make quite a
+few changes to the gluster roles, so we moved them of kubespray and added
+another playbook to help On top of gluster, we use heketi as a service to allow
+kubernetes to control allocation and mangement of storage. 
 ```
   $ cd ansible
   $ ansible-playbook -i hosts.ini -b -v storage.yml
-
+```
+Then on the master
+```
   $ heketi cluster list
     Clusters:
     Id:73459fb776036c004c40480df0cfa184
@@ -205,7 +285,10 @@ Events:         <none>
 If things are showing as ready, proceed with testing out the kubernetes
 deployment.
 
-### Gluster
+### Old Gluster Documentation
+
+** Most of the information in this section is superceeded by the stuff above. It
+is being left here for the moment to help with debugging of gluster **
 
 It might be necessary to add distributed storage to the cluster for some
 tasks. We can do this by adding volumes to the hosts in openstack then using
@@ -310,7 +393,6 @@ As long as this stuff works, you should be ready to define a storage class in
 kubernetes.
 
 ### Kubernetes Storage
-  ** Try NFS to see if we can do things simpler~ **
 
 Kubernetes pod storage works on a system of PersistentVolumes and
 PersinstentVolumeClaims. Once you have heketi up the idea is to define a

@@ -1,0 +1,13 @@
+---
+- name: Set /etc/hostname
+  hostname: 
+    name: "{{ inventory_hostname }}"
+
+- name: Disable updating hostname in cloud-config
+  lineinfile:
+    dest: /etc/cloud/cloud.cfg
+    regexp: 'update_hostname$'
+    line: '# - update_hostname'
+    backup: yes
+  tags: cloud-config
+

@@ -1,3 +1,6 @@
+- src: git+https://github.com/geerlingguy/ansible-role-nfs.git
+  version: "1.2.3"
+  name: ansible-role-nfs
 - src: git+https://github.com/geerlingguy/ansible-role-repo-epel.git
   version: "1.2.2"
   name: ansible-role-repo-epel

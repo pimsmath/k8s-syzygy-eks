@@ -1,0 +1,48 @@
+- name: Fix sudo TTY
+  hosts: all
+  tasks:
+    - name: Disable sudo requiretty
+      lineinfile:
+        dest: /etc/sudoers
+        line: 'Defaults    requiretty'
+        state: absent
+      become: true
+      vars:
+          ansible_ssh_pipelining: no
+      tags: always
+
+- name: NFS Server Setup
+  hosts: all
+  become: true
+  gather_facts: false
+  roles:
+    - { role: nfs-disk,                    tags: ["setup", "nfs"] }
+    - { role: ansible-role-nfs,            tags: ["setup", "nfs"] }
+
+- name: Jupyter Setup
+  hosts: all
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Update all packages
+      yum:
+        name: "*"
+        state: latest
+      ignore_errors: true
+      when: "not disable_update | default(false)"
+
+  roles:
+    - { role: elrepo-kernel,               tags: ["setup", "elrepo"] }
+    - { role: hostname,                    tags: ["setup", "hostname"] }
+    - { role: base-packages,               tags: ["setup", "base-packages"] }
+    - { role: ssh-public-keys,             tags: ["setup", "ssh"] }
+
+- hosts: all
+  gather_facts: false
+  become: true
+  tasks:
+    - name: Reboot instance
+      command: /sbin/shutdown -r +1
+      async: 0
+      poll: 0
+      ignore_errors: true
