@@ -235,15 +235,13 @@ provisioner: fuseim.pri/ifs # or choose another name, must match deployment's en
   $ kubectl create -f class.yml
 ```
 
-You should now be able to make PVCs and get a result
-```
 You should be able to see the nfs-client-provisioner pod come up.
 ```
   $ kubectl get pods
 NAME                                      READY     STATUS    RESTARTS   AGE
 nfs-client-provisioner-7c878d4d49-hf6gr   1/1       Running   0          1h
 ```
-If you run into problems, check `kubect logs nfs-client...`
+If you run into problems, check `kubect logs nfs-client...
 
 #### Testing - Make a PVC
 We can test a claim
