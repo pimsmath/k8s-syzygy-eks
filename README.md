@@ -268,3 +268,146 @@ myclaim-1   Bound     pvc-36f2aa39-57d3-11e8-8af6-fa163e2d1d82   1Gi        RWO 
   $ kubectl delete -f test-pvc.yaml
 ```
 
+## Ingress
+
+The setup above will give us somewhere to install zero-to-jupyterhub with
+persistant storage and facilities to scale the number of nodes, but we need to
+provide a mechanism to connect external users to the hub. In kubernetes this is
+called an ingress, and we will use the
+[kuberbetes/ingress-nginx](https://github.com/kubernetes/ingress-nginx) ingress
+to provide access.
+
+An Ingress Controller monitors ingress resources via the k8s API and updates the
+configuration of a load balancer in case of any changes. For the ingress-nginx
+controller, this means building an nginx configuration to map services to the
+outside. ingress-nginx is deployed as a kubernetes pod which watches the the
+apiserver's /ingress endpoint for updates to the ingress resource and tries to
+satisfy those requests.
+
+  [Request] -> ingress-nginx -> Service(s) -> Pods
+
+Part of our setup will be via NodePorts. NodePorts open a specific port on
+each kubernetes node (the same across the cluster) and traffic is directed from
+any of these ports to the relevant service.
+
+  * Annotations: Sets a specific configuration for a particular ingress rule
+  * Configuration Map: Sets global configurations in NGINX
+
+```
+  $ kubectl apply -f deploy/namespace.yaml
+  $ kubectl apply -f deploy/default-backend.yaml
+  $ kubectl apply -f deploy/configmap.yaml
+  $ kubectl apply -f deploy/tcp-services-configmap.yaml
+  $ kubectl apply -f deploy/udp-services-configmap.yaml
+  $ kubectl apply -f deploy/rbac.yaml
+  $ kubectl apply -f deploy/with-rbac.yaml
+  $ kubectl apply -f deploy/provider/baremetal/service-nodeport.yaml
+
+  # Verify that the ingress controller pods have started 
+  $ kubectl get pods --all-namespaces -l app=ingress-nginx --watch
+```
+
+Detect installed version
+```
+  $ POD_NAMESPACE=ingress-nginx
+  $ POD_NAME=$(kubectl get pods -n $POD_NAMESPACE -l app=ingress-nginx -o jsonpath={.items[0].metadata.name})
+  $ kubectl exec -it $POD_NAME -n $POD_NAMESPACE -- /nginx-ingress-controller --version
+```
+Find the clusterIP
+```
+  $ CLUSTER_IP=$(kubectl get svc -n ingress-nginx ingress-nginx -o jsonpath={.spec.clusterIP})
+  $ echo ${CLUSTER_IP} hello.com >> /etc/hosts
+```
+
+Add an annotation and test (N.B. The host and path are used as rules)
+```
+
+  $ kubectl run echoserver --image=gcr.io/google_containers/echoserver:1.4 --port=8080
+  $ kubectl expose deployment echoserver --type=NodePort
+  
+  $ curl http://hello.com
+default backend - 404
+  $ curl http://hello.com/echo
+default backend - 404
+
+  $ vi annotation.yaml
+apiVersion: extensions/v1beta1
+kind: Ingress
+metadata:
+  name: kubecon
+  annotations:
+    nginx.ingress.kubernetes.io/nickname: "Wooohoooooo we're here!!!"
+spec:
+  rules:
+  - host: hello.com
+    http:
+      paths:
+      - path: /echo
+        backend:
+          serviceName: echoserver
+          servicePort: 8080
+
+  $ kubectl apply -f annotation.yaml
+  $ curl http://hello.com
+default backend - 404
+  $ curl http://hello.com/echo
+CLIENT VALUES:
+client_address=10.233.65.3
+command=GET
+real path=/echo
+query=nil
+request_version=1.1
+request_uri=http://hello.com:8080/echo
+
+SERVER VALUES:
+server_version=nginx: 1.10.0 - lua: 10001
+
+HEADERS RECEIVED:
+accept=*/*
+connection=close
+host=hello.com
+user-agent=curl/7.29.0
+x-forwarded-for=10.233.66.0
+x-forwarded-host=hello.com
+x-forwarded-port=80
+x-forwarded-proto=http
+x-original-uri=/echo
+x-real-ip=10.233.66.0
+x-scheme=http
+BODY:
+-no body in request-
+```
+
+Now via the NodePort 
+```
+  $ IPADDR0=$(ip addr show eth0 | grep -Po 'inet \K[\d.]+')
+  $ NODEPORT80=$(kubectl get svc -n ingress-nginx ingress-nginx -o jsonpath={.spec.ports[0].nodePort})
+  $ NODEPORT443=$(kubectl get svc -n ingress-nginx ingress-nginx -o jsonpath={.spec.ports[1].nodePort})
+
+  $ curl --header 'Host: hello.com' ${IPADDR0}:${NODEPORT80}/echo
+CLIENT VALUES:
+client_address=10.233.65.3
+command=GET
+real path=/echo
+query=nil
+request_version=1.1
+request_uri=http://hello.com:8080/echo
+
+SERVER VALUES:
+server_version=nginx: 1.10.0 - lua: 10001
+
+HEADERS RECEIVED:
+accept=*/*
+connection=close
+host=hello.com
+user-agent=curl/7.29.0
+x-forwarded-for=10.233.66.0
+x-forwarded-host=hello.com
+x-forwarded-port=80
+x-forwarded-proto=http
+x-original-uri=/echo
+x-real-ip=10.233.66.0
+x-scheme=http
+BODY:
+-no body in request-
+```
