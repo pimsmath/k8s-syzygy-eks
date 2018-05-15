@@ -12,7 +12,7 @@
       tags: always
 
 - name: NFS Server Setup
-  hosts: all
+  hosts: nfs-server
   become: true
   gather_facts: false
   roles:
