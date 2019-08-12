@@ -1,3 +1,0 @@
----
-- name: Add k8s heketi storageclass
-  command: /usr/local/bin/kubectl apply -f /etc/heketi/k8s-storageclass.yml

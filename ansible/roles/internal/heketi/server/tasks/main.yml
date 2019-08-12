@@ -1,9 +1,0 @@
----
-- name: Include OS-specific variables
-  include_vars: "{{ ansible_os_family }}.yml"
-
-- include: setup-RedHat.yml
-  when: ansible_os_family == 'RedHat'
-
-- name: Ensure Heketi is started and enabled at boot
-  service: "name={{ heketi_daemon }} state=started enabled=yes"

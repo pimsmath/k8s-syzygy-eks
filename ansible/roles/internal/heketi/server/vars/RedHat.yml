@@ -1,4 +1,0 @@
----
-heketi_daemon: "heketi"
-heketi_daemon_package: "heketi"
-heketi_client_package: "heketi-client"

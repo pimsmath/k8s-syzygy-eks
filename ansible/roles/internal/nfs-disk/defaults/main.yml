@@ -1,6 +1,0 @@
-# openstack_ephemeral_docker_disk:
-nfs_disk_align: 'optimal'
-nfs_disk_partition: 1
-nfs_disk_start: '2048s'
-nfs_disk_end: '100%'
-nfs_disk_part_type: 'primary'

@@ -1,8 +1,0 @@
----
-# Tasks for base package installation (RedHat)
-- name: Install base packages
-  yum:
-    name: '{{ item.name }}'
-    state: '{{ item.state }}'
-  tags: setup
-  with_items: '{{ base_packages }}'
