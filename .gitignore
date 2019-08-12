@@ -5,3 +5,4 @@ openrc.sh
 *.tfstate.backup
 *.retry
 terraform/.terraform
+.terraform
