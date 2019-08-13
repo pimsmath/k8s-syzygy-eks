@@ -49,6 +49,18 @@ $ kubectl create -f docs/rbac-config.yaml
 $ helm init --service-account tiller --history-max 200
 ```
 
+Pick a domain name where the service will run. For this example, we will be
+using [k8s.syzygy.ca]. The service must be run over TLS/SSL so we need to
+arrange for certificates and keys. For the example we will use ACM ([Amazon
+Certificate Manager](https://aws.amazon.com/certificate-manager/), but
+[letsencrypt via
+cert-manager](https://docs.bitnami.com/kubernetes/how-to/secure-kubernetes-services-with-ingress-tls-letsencrypt/)
+also works (at the expense of installing an extra chart). In ACM create a new
+certificate and populate the DNS validation CNAME as requested. Once the
+certificate is issued, add the arn to `shib.acm.arn` in the `one-two-jupyterhub`
+config.yaml.
+
+
 Install a release of one-two-syzygy, e.g.
 ```bash
 $ helm upgrade --wait --install --namespace=syzygy syzygy one-two-syzygy \
