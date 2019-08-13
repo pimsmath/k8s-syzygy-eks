@@ -3,6 +3,7 @@ kubespray.tar.gz
 openrc.sh
 *.tfstate
 *.tfstate.backup
+*.tfstate.lock*
 *.retry
 terraform/.terraform
 .terraform
