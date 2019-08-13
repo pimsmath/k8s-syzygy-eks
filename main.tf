@@ -1,17 +1,34 @@
+terraform {
+  required_version = ">= 0.12.0"
+}
+
 provider "aws" {
     version = ">= 2.11"
-    region  = "us-west-2"
+    region  = var.region
+    profile = var.profile
 }
 
 provider "random" {
   version = "~> 2.2"
 }
 
+provider "local" {
+  version = "~> 1.2"
+}
+
+provider "null" {
+  version = "~> 2.1"
+}
+
+provider "template" {
+  version = "~> 2.1"
+}
+
 data "aws_availability_zones" "available" {
 }
 
 locals {
-  cluster_name = "test-eks-${random_string.suffix.result}"
+  cluster_name = "syzygy-eks-${random_string.suffix.result}"
 }
 
 resource "random_string" "suffix" {
@@ -29,7 +46,7 @@ resource "aws_security_group" "worker_group_mgmt_one" {
     protocol  = "tcp"
 
     cidr_blocks = [
-      "192.168.0.0/16"
+      "10.0.0.0/8"
     ]
   }
 }
@@ -54,7 +71,6 @@ resource "aws_security_group" "all_worker_mgmt" {
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
   version = "2.9.0"
-
 
   name                 = "eks-vpc"
   cidr                 = "10.1.0.0/16"
@@ -84,6 +100,9 @@ module "eks" {
   source       = "terraform-aws-modules/eks/aws"
   version      = "5.1.0"
   cluster_name = local.cluster_name
+  kubeconfig_aws_authenticator_env_variables = {
+    AWS_PROFILE = "${var.profile}"
+  }
   subnets      = module.vpc.private_subnets
 
   tags = {

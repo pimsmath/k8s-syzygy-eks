@@ -2,6 +2,11 @@ variable "region" {
   default = "us-west-2"
 }
 
+variable "profile" {
+  description = "AWS profile to use for authentication"
+  default     = "iana"
+}
+
 variable "map_accounts" {
   description = "Additional AWS account numbers to add to the aws-auth configmap."
   type        = list(string)
