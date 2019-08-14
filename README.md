@@ -13,7 +13,7 @@ $ terraform apply
 If the cluster deploys OK, add the config to your `~/.kube/config`
 
 ```bash
-$ aws --profile=iana eks list-clusters
+$ aws --profile=iana --region=us-west-2 eks list-clusters
 ...
 {
     "clusters": [
@@ -64,9 +64,9 @@ config.yaml.
 Install a release of one-two-syzygy, e.g.
 ```bash
 $ helm upgrade --wait --install --namespace=syzygy syzygy one-two-syzygy \
-  --values=one-two-syzygy/values.yaml -f config.yaml
-  --set-file "shib.shibboleth2xml=./files/shibboleth2.xml"
-  --set-file "shib.idpmetadataxml=./files/idp-metadata.xml"
+  --values=one-two-syzygy/values.yaml -f config.yaml \
+  --set-file "shib.shibboleth2xml=./files/shibboleth2.xml" \
+  --set-file "shib.idpmetadataxml=./files/idp-metadata.xml" \
   --set-file "shib.attributemapxml=./files/attribute-map.xml"
 ```
 

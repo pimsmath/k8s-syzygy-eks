@@ -127,3 +127,34 @@ module "eks" {
   map_users                            = var.map_users
   map_accounts                         = var.map_accounts
 }
+
+resource "aws_efs_file_system" "home" {
+}
+
+resource "aws_efs_mount_target" "home_mount" {
+  count           = length(module.vpc.private_subnets)
+  file_system_id  = aws_efs_file_system.home.id
+  subnet_id       = element(module.vpc.private_subnets, count.index)
+  security_groups = [aws_security_group.efs_mt_sg.id]
+}
+
+resource "aws_security_group" "efs_mt_sg" {
+  name_prefix = "efs_mt_sg"
+  description = "Allow NFSv4 traffic"
+  vpc_id      = module.vpc.vpc_id
+
+  lifecycle {
+    create_before_destroy = true
+  }
+
+  ingress {
+    from_port = 2049
+    to_port   = 2049
+    protocol  = "tcp"
+
+    cidr_blocks = [
+      "10.1.0.0/16"
+    ]
+  }
+}
+

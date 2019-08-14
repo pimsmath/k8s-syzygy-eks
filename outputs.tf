@@ -22,3 +22,8 @@ output "region" {
   description = "AWS region."
   value       = var.region
 }
+
+output "efs-id" {
+  description = "AWS EFS FileSystemID"
+  value       = aws_efs_file_system.home.id
+}
