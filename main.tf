@@ -9,7 +9,7 @@ terraform {
 }
 
 provider "aws" {
-    version = ">= 2.11"
+    version = ">= 2.28.1"
     region  = var.region
     profile = var.profile
 }
@@ -104,7 +104,7 @@ module "vpc" {
 
 module "eks" {
   source       = "terraform-aws-modules/eks/aws"
-  version      = "5.1.0"
+  version      = "6.0.2"
   cluster_name = local.cluster_name
   kubeconfig_aws_authenticator_env_variables = {
     AWS_PROFILE = "${var.profile}"
