@@ -10,8 +10,6 @@ terraform {
 
 provider "azurerm" {
     version = ">=1.36.1"
-    name      = "${local.cluster_name}"
-    location  = var.location
 }
 
 provider "random" {
