@@ -48,7 +48,7 @@ resource "azurerm_kubernetes_cluster" "jub" {
   name                = "${local.cluster_name}"
   location            = "${azurerm_resource_group.jhub.location}"
   resource-group_name = "${azurerm_resource_group.jhub.name}"
-  dns_prefix          = "${var.prefix-k8s}"
+  dns_prefix          = "${var.prefix}-k8s"
 
   agent_pool_profile {
     name            = "default"
