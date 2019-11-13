@@ -42,7 +42,7 @@ resource "azurerm_resource_group" "jhub" {
   location = "${var.location}"
 }
 
-resource "azurerm_kubernetes_cluster" "jub" {
+resource "azurerm_kubernetes_cluster" "jhub" {
   name                = "${local.cluster_name}"
   location            = "${azurerm_resource_group.jhub.location}"
   resource-group_name = "${azurerm_resource_group.jhub.name}"
