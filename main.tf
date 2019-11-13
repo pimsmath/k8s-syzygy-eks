@@ -8,6 +8,11 @@ terraform {
   required_version = ">= 0.12.0"
 }
 
+# This is necessary for the state file
+provider "aws" {
+  region = "ca-central-1"
+}
+
 provider "azurerm" {
     version = ">=1.36.1"
     subscription_id = "${var.subscription_id}"
@@ -54,7 +59,7 @@ resource "azurerm_kubernetes_cluster" "jhub" {
 
   agent_pool_profile {
     name            = "default"
-    count           = 1
+    count           = 3
     vm_size         = "Standard_D1_v2"
     os_type         = "Linux"
     os_disk_size_gb = 30
