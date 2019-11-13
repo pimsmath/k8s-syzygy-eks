@@ -10,8 +10,8 @@ terraform {
 
 provider "azure" {
     version = ">= 1.36.0"
-    name      = ${local.cluster_name}
-    location  = var.region-k8s-resources
+    name      = "${local.cluster_name}"
+    location  = var.location
 }
 
 provider "random" {
