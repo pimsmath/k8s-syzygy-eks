@@ -11,6 +11,7 @@ terraform {
 # This is necessary for the state file
 provider "aws" {
   region = "ca-central-1"
+   version = ">=2.35"
 }
 
 provider "azurerm" {
