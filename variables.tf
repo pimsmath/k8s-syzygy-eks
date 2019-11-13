@@ -1,36 +1,16 @@
-variable "region" {
-  default = "us-west-2"
+variable "prefix" {
+  description = "A prefix used for all resources in this example"
 }
 
-variable "profile" {
-  description = "AWS profile to use for authentication"
-  default     = "iana"
+variable "location" {
+  description = "The Azure Region in which all resources in this example should be provisioned"
+  default = "canadacentral"
 }
 
-variable "map_accounts" {
-  description = "Additional AWS account numbers to add to the aws-auth configmap."
-  type        = list(string)
-
-  default = []
+variable "kubernetes_client_id" {
+  description = "The Client ID for the Service Principal to use for this Managed Kubernetes Cluster"
 }
 
-variable "map_roles" {
-  description = "Additional IAM roles to add to the aws-auth configmap."
-  type = list(object({
-    rolearn  = string
-    username = string
-    groups   = list(string)
-  }))
-
-  default = []
-}
-
-variable "map_users" {
-  description = "Additional IAM users to add to the aws-auth configmap."
-  type = list(object({
-    userarn  = string
-    username = string
-    groups   = list(string)
-  }))
-  default = []
+variable "kubernetes_client_secret" {
+  description = "The Client Secret for the Service Principal to use for this Managed Kubernetes Cluster"
 }
