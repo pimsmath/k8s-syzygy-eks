@@ -76,7 +76,7 @@ resource "aws_security_group" "all_worker_mgmt" {
 
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
-  version = "2.9.0"
+  version = "2.21.0"
 
   name                 = "eks-vpc"
   cidr                 = "10.1.0.0/16"
@@ -104,7 +104,7 @@ module "vpc" {
 
 module "eks" {
   source       = "terraform-aws-modules/eks/aws"
-  version      = "6.0.2"
+  version      = "7.0.1"
   cluster_name = local.cluster_name
   kubeconfig_aws_authenticator_env_variables = {
     AWS_PROFILE = "${var.profile}"
