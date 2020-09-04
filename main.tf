@@ -123,8 +123,26 @@ module "eks" {
     {
       name                          = "worker-group-1"
       instance_type                 = "t2.medium"
-      asg_desired_capacity          = 3
+      asg_desired_capacity          = 2
       additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id]
+    },
+    {
+      name                          = "user-group-1"
+      instance_type                 = "t2.medium"
+      asg_desired_capacity          = 1
+      additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id]
+      tags = [
+        {
+          "key"                     = "k8s.io/cluster-autoscaler/enabled"
+          "propagate_at_launch"     = "false"
+          "value"                   = "true"
+        },
+        {
+          "key"                     = "k8s.io/cluster-autoscaler/${local.cluster_name}"
+          "propagate_at_launch"     = "false"
+          "value"                   = "true"
+        }
+      ]
     }
   ]
 
