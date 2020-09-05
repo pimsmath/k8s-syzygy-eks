@@ -114,7 +114,7 @@ module "vpc" {
 
 module "eks" {
   source       = "terraform-aws-modules/eks/aws"
-  version      = "12.0.1"
+  version      = "12.2.0"
   cluster_name = local.cluster_name
   kubeconfig_aws_authenticator_env_variables = {
     AWS_PROFILE = "${var.profile}"
