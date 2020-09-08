@@ -38,6 +38,14 @@ provider "kubernetes" {
   version                = "~> 1.11"
 }
 
+data "aws_eks_cluster" "cluster" {
+  name = module.eks.cluster_id
+}
+
+data "aws_eks_cluster_auth" "cluster" {
+  name = module.eks.cluster_id
+}
+
 data "aws_availability_zones" "available" {
 }
 
@@ -115,7 +123,10 @@ module "vpc" {
 module "eks" {
   source       = "terraform-aws-modules/eks/aws"
   version      = "12.2.0"
+  cluster_version = "1.17"
+
   cluster_name = local.cluster_name
+
   kubeconfig_aws_authenticator_env_variables = {
     AWS_PROFILE = "${var.profile}"
   }
@@ -142,6 +153,9 @@ module "eks" {
       name                          = "user-group-1"
       instance_type                 = "t2.medium"
       asg_desired_capacity          = 1
+      asg_min_size                  = 1
+      asg_max_size                  = 10
+      kubelet_extra_args            = "--node-labels=hub.jupyter.org/node-purpose=user --register-with-taints=hub.jupyter.org/dedicated=user:NoSchedule"
       additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id]
       tags = [
         {
