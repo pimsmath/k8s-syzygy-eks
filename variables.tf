@@ -7,6 +7,26 @@ variable "profile" {
   default     = "iana"
 }
 
+variable "worker_group_user_node_type" }
+  description = "AWS Node type for user pod nodes"
+  default     = "t2.medium"
+}
+
+variable "worker_group_user_asg_min_size" }
+  description = "Minimum size for user node ASG"
+  default     = "0"
+}
+
+variable "worker_group_user_asg_max_size" }
+  description = "Maximum size for user node ASG"
+  default     = "4"
+}
+
+variable "worker_group_user_asg_desired_capacity" }
+  description = "Desired capacity for user node ASG"
+  default     = "0"
+}
+
 variable "map_accounts" {
   description = "Additional AWS account numbers to add to the aws-auth configmap."
   type        = list(string)

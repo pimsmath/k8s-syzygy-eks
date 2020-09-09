@@ -151,10 +151,10 @@ module "eks" {
     },
     {
       name                          = "user-group-1"
-      instance_type                 = "t2.medium"
-      asg_desired_capacity          = 1
-      asg_min_size                  = 1
-      asg_max_size                  = 10
+      instance_type                 = var.worker_group_user_node_type
+      asg_desired_capacity          = var.worker_group_user_asg_desired_capacity
+      asg_min_size                  = var.worker_group_user_asg_min_size
+      asg_max_size                  = var.worker_group_user_asg_max_size
       kubelet_extra_args            = "--node-labels=hub.jupyter.org/node-purpose=user --register-with-taints=hub.jupyter.org/dedicated=user:NoSchedule"
       additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id]
       tags = [
