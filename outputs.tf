@@ -23,7 +23,22 @@ output "region" {
   value       = var.region
 }
 
-output "efs-id" {
+output "cluster_name" {
+  description = "AWS EKS cluster name"
+  value       = module.eks.cluster_id
+}
+
+output "efs_id" {
   description = "AWS EFS FileSystemID"
   value       = aws_efs_file_system.home.id
+}
+
+output "vpc_id" {
+  description = "VPC"
+  value       = module.vpc.vpc_id
+}
+
+output "subnet_id" {
+  description = "Publicly accessible subnet inside our VPC"
+  value       = module.vpc.public_subnets[0]
 }
