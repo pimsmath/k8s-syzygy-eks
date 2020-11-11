@@ -52,7 +52,7 @@ data "aws_availability_zones" "available" {
 locals {
   cluster_name = "syzygy-eks-${random_string.suffix.result}"
   k8s_service_account_namespace = "kube-system"
-  k8s_service_account_name      = "cluster-autoscaler-aws-cluster-autoscaler"
+  k8s_service_account_name      = "cluster-autoscaler-aws-cluster-autoscaler-chart"
 }
 
 resource "random_string" "suffix" {
