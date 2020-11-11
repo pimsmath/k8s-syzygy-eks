@@ -128,7 +128,7 @@ module "eks" {
   cluster_name = local.cluster_name
 
   kubeconfig_aws_authenticator_env_variables = {
-    AWS_PROFILE = "${var.profile}"
+    AWS_PROFILE = var.profile
   }
   subnets      = module.vpc.private_subnets
 
