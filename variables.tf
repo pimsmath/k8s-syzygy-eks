@@ -1,10 +1,10 @@
 variable "region" {
-  default = "us-west-2"
+  default = "ca-central-1"
 }
 
 variable "profile" {
   description = "AWS profile to use for authentication"
-  default     = "iana"
+  default     = "default"
 }
 
 variable "worker_group_user_node_type" {

@@ -1,8 +1,8 @@
-terraform {
+#terraform {
   # The configuration for this backend will be filled in by Terragrunt
-  backend "s3" {
-  }
-}
+#  backend "s3" {
+#  }
+#}
 
 terraform {
   required_version = ">= 0.12.0"
@@ -50,15 +50,15 @@ data "aws_availability_zones" "available" {
 }
 
 locals {
-  cluster_name = "syzygy-eks-${random_string.suffix.result}"
+  cluster_name = "ubc-eks"
   k8s_service_account_namespace = "kube-system"
   k8s_service_account_name      = "cluster-autoscaler-aws-cluster-autoscaler-chart"
 }
 
-resource "random_string" "suffix" {
-  length = 8
-  special = false
-}
+#resource "random_string" "suffix" {
+#  length = 8
+#  special = false
+#}
 
 resource "aws_security_group" "worker_group_mgmt_one" {
   name_prefix = "worker_group_mgmt_one"
@@ -107,16 +107,20 @@ module "vpc" {
 
   tags = {
     "kubernetes.io/cluster/${local.cluster_name}" = "shared"
+    "project" = "jupyterhub"
+  
   }
 
   public_subnet_tags = {
     "kubernetes.io/cluster/${local.cluster_name}" = "shared"
     "kubernetes.io/role/elb"                      = "1"
+    "project"                                      = "jupyterhub"
   }
 
   private_subnet_tags = {
     "kubernetes.io/cluster/${local.cluster_name}" = "shared"
     "kubernetes.io/role/internal-elb"             = "1"
+    "project"                                     = "jupyterhub"
   }
 }
 
@@ -136,6 +140,7 @@ module "eks" {
     Environment = "ubc"
     GithubRepo  = "terraform-aws-eks"
     GithubOrg   = "terraform-aws-modules"
+    project     = "jupyterhub"
   }
 
   vpc_id = module.vpc.vpc_id
@@ -162,11 +167,13 @@ module "eks" {
           "key"                     = "k8s.io/cluster-autoscaler/enabled"
           "propagate_at_launch"     = "false"
           "value"                   = "true"
+          "project"                 = "jupyterhub"
         },
         {
           "key"                     = "k8s.io/cluster-autoscaler/${local.cluster_name}"
           "propagate_at_launch"     = "false"
           "value"                   = "true"
+          "application"             = "true"
         }
       ]
     }
@@ -207,4 +214,3 @@ resource "aws_security_group" "efs_mt_sg" {
     ]
   }
 }
-

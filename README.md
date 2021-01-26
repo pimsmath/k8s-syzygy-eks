@@ -77,3 +77,16 @@ $ kubectl -n syzygy get svc/sp
 NAME   TYPE           CLUSTER-IP      EXTERNAL-IP                                                              PORT(S)                      AGE
 sp     LoadBalancer   172.20.28.153   a0d9590f3be0111e983c802cecd4bb8d-668104507.us-west-2.elb.amazonaws.com   80:30656/TCP,443:30792/TCP   5m30s
 ```
+
+
+# Suggested values: advanced users of Kubernetes and Helm should feel
+# free to use different values.
+RELEASE=jhub
+NAMESPACE=jhub
+
+helm upgrade --cleanup-on-fail \
+  --install $RELEASE jupyterhub/jupyterhub \
+  --namespace $NAMESPACE \
+  --create-namespace \
+  --version=0.10.6 \
+  --values config.yaml
