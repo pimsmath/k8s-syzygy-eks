@@ -124,7 +124,7 @@ module "eks" {
   source       = "terraform-aws-modules/eks/aws"
   version      = "15.2.0"
   cluster_name = local.cluster_name
-  cluster_version = "1.17"
+  cluster_version = "1.19"
 
   kubeconfig_aws_authenticator_env_variables = {
     AWS_PROFILE = var.profile
