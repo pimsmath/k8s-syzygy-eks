@@ -73,6 +73,7 @@ resource "aws_security_group" "worker_group_mgmt_one" {
       "192.168.0.0/16"
     ]
   }
+  tags = var.tags
 }
 
 resource "aws_security_group" "all_worker_mgmt" {
@@ -90,6 +91,7 @@ resource "aws_security_group" "all_worker_mgmt" {
       "192.168.0.0/16",
     ]
   }
+  tags = var.tags
 }
 
 module "vpc" {
@@ -104,13 +106,20 @@ module "vpc" {
   private_subnets      = ["10.1.1.0/24", "10.1.2.0/24"]
   public_subnets       = ["10.1.101.0/24", "10.1.102.0/24"]
 
+  enable_ipv6                     = true
+  assign_ipv6_address_on_creation = true
+  create_egress_only_igw          = true
+
+  public_subnet_ipv6_prefixes  = [0, 1]
+  private_subnet_ipv6_prefixes = [2, 3]
+
   enable_nat_gateway   = true
   single_nat_gateway   = true
   enable_dns_hostnames = true
 
-  tags = {
-    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
-  }
+  enable_flow_log                      = true
+  create_flow_log_cloudwatch_iam_role  = true
+  create_flow_log_cloudwatch_log_group = true
 
   public_subnet_tags = {
     "kubernetes.io/cluster/${local.cluster_name}" = "shared"
@@ -121,8 +130,27 @@ module "vpc" {
     "kubernetes.io/cluster/${local.cluster_name}" = "shared"
     "kubernetes.io/role/internal-elb"             = "1"
   }
+
+  tags = var.tags
 }
 
+module "vpc_cni_irsa" {
+  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
+  version = "~> 4.12"
+
+  role_name_prefix      = "VPC-CNI-IRSA"
+  attach_vpc_cni_policy = true
+  vpc_cni_enable_ipv6   = true
+
+  oidc_providers = {
+    main = {
+      provider_arn               = module.eks.oidc_provider_arn
+      namespace_service_accounts = ["kube-system:aws-node"]
+    }
+  }
+
+  tags = var.tags
+}
 
 module "eks" {
 
@@ -130,8 +158,12 @@ module "eks" {
 
   cluster_name    = local.cluster_name
   cluster_version = local.cluster_version
+
   cluster_endpoint_private_access = true
   cluster_endpoint_public_access  = true
+
+  cluster_ip_family = "ipv6"
+  create_cni_ipv6_iam_policy = true
 
   cluster_addons = {
     coredns = {
@@ -140,7 +172,7 @@ module "eks" {
     kube-proxy = {}
     vpc-cni = {
       resolve_conflicts        = "OVERWRITE"
-      #service_account_role_arn = module.vpc_cni_irsa.iam_role_arn
+      service_account_role_arn = module.vpc_cni_irsa.iam_role_arn
     }
   }
 
@@ -200,6 +232,7 @@ module "eks" {
       "k8s.io/cluster-autoscaler/enabled" : true,
       "k8s.io/cluster-autoscaler/${local.cluster_name}" : "owned",
     }
+    iam_role_attach_cni_policy = true
   }
 
   self_managed_node_groups = {
@@ -208,12 +241,14 @@ module "eks" {
 
     workers = {
       name                          = "worker-group-1"
+
+      ami_id  = data.aws_ami.eks_default.id
       instance_type                 = var.worker_group_user_node_type
+
       desired_capacity              = var.worker_group_desired_capacity
       min_size                      = var.worker_group_min_size
       max_size                      = var.worker_group_max_size
 
-      ami_id  = data.aws_ami.eks_default.id
 
       additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id]
       iam_role_additional_policies = ["arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"]
@@ -238,6 +273,7 @@ module "eks" {
       EOT
     }
   }
+  tags = var.tags
 }
 
 resource "aws_efs_file_system" "home" {
@@ -268,12 +304,16 @@ resource "aws_security_group" "efs_mt_sg" {
       "10.1.0.0/16"
     ]
   }
+
+  tags = var.tags
 }
 
 resource "aws_kms_key" "eks" {
   description             = "EKS Secret Encryption Key"
   deletion_window_in_days = 7
   enable_key_rotation     = true
+
+  tags = var.tags
 }
 
 data "aws_ami" "eks_default" {
@@ -284,6 +324,98 @@ data "aws_ami" "eks_default" {
     name   = "name"
     values = ["amazon-eks-node-${local.cluster_version}-v*"]
   }
+}
+
+resource "aws_iam_role_policy_attachment" "additional" {
+  for_each = module.eks.eks_managed_node_groups
+
+  policy_arn = aws_iam_policy.node_additional.arn
+  role       = each.value.iam_role_name
+}
+
+resource "aws_launch_template" "external" {
+  name_prefix            = "external-eks-ex-"
+  description            = "EKS managed node group external launch template"
+  update_default_version = true
+
+  block_device_mappings {
+    device_name = "/dev/xvda"
+
+    ebs {
+      volume_size           = 100
+      volume_type           = "gp2"
+      delete_on_termination = true
+    }
+  }
+
+  monitoring {
+    enabled = true
+  }
+
+  # Disabling due to https://github.com/hashicorp/terraform-provider-aws/issues/23766
+  # network_interfaces {
+  #   associate_public_ip_address = false
+  #   delete_on_termination       = true
+  # }
+
+  # if you want to use a custom AMI
+  # image_id      = var.ami_id
+
+  # If you use a custom AMI, you need to supply via user-data, the bootstrap script as EKS DOESNT merge its managed user-data then
+  # you can add more than the minimum code you see in the template, e.g. install SSM agent, see https://github.com/aws/containers-roadmap/issues/593#issuecomment-577181345
+  # (optionally you can use https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs/data-sources/cloudinit_config to render the script, example: https://github.com/terraform-aws-modules/terraform-aws-eks/pull/997#issuecomment-705286151)
+  # user_data = base64encode(data.template_file.launch_template_userdata.rendered)
+
+  tag_specifications {
+    resource_type = "instance"
+
+    tags = {
+      Name      = "external_lt"
+      CustomTag = "Instance custom tag"
+    }
+  }
+
+  tag_specifications {
+    resource_type = "volume"
+
+    tags = {
+      CustomTag = "Volume custom tag"
+    }
+  }
+
+  tag_specifications {
+    resource_type = "network-interface"
+
+    tags = {
+      CustomTag = "EKS example"
+    }
+  }
+
+  tags = var.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_iam_policy" "node_additional" {
+  name        = "${local.cluster_name}-additional"
+  description = "Example usage of node additional policy"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "ec2:Describe*",
+        ]
+        Effect   = "Allow"
+        Resource = "*"
+      },
+    ]
+  })
+
+  tags = var.tags
 }
 
 # This policy is required for the KMS key used for EKS root volumes, so the cluster is allowed to enc/dec/attach encrypted EBS volumes

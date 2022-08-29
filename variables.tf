@@ -54,3 +54,9 @@ variable "map_users" {
   }))
   default = []
 }
+
+variable "tags" {
+    description = "Tags for resources"
+    type        = map(string)
+    default     = {}
+}
