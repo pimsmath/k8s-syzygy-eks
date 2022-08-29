@@ -48,7 +48,7 @@ locals {
   cluster_name = "syzygy-eks-${random_string.suffix.result}"
   cluster_version = "1.22"
   k8s_service_account_namespace = "kube-system"
-  k8s_service_account_name      = "cluster-autoscaler-aws-cluster-autoscaler-chart"
+  k8s_service_account_name      = "cluster-autoscaler-aws-cluster-autoscaler"
 }
 
 data "aws_caller_identity" "current" {}
