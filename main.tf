@@ -106,13 +106,6 @@ module "vpc" {
   private_subnets      = ["10.1.1.0/24", "10.1.2.0/24"]
   public_subnets       = ["10.1.101.0/24", "10.1.102.0/24"]
 
-  enable_ipv6                     = true
-  assign_ipv6_address_on_creation = true
-  create_egress_only_igw          = true
-
-  public_subnet_ipv6_prefixes  = [0, 1]
-  private_subnet_ipv6_prefixes = [2, 3]
-
   enable_nat_gateway   = true
   single_nat_gateway   = true
   enable_dns_hostnames = true
@@ -134,23 +127,6 @@ module "vpc" {
   tags = var.tags
 }
 
-module "vpc_cni_irsa" {
-  source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
-  version = "~> 4.12"
-
-  role_name_prefix      = "VPC-CNI-IRSA"
-  attach_vpc_cni_policy = true
-  vpc_cni_enable_ipv6   = true
-
-  oidc_providers = {
-    main = {
-      provider_arn               = module.eks.oidc_provider_arn
-      namespace_service_accounts = ["kube-system:aws-node"]
-    }
-  }
-
-  tags = var.tags
-}
 
 module "eks" {
 
@@ -162,9 +138,6 @@ module "eks" {
   cluster_endpoint_private_access = true
   cluster_endpoint_public_access  = true
 
-  cluster_ip_family = "ipv6"
-  create_cni_ipv6_iam_policy = true
-
   cluster_addons = {
     coredns = {
       resolve_conflicts = "OVERWRITE"
@@ -172,14 +145,8 @@ module "eks" {
     kube-proxy = {}
     vpc-cni = {
       resolve_conflicts        = "OVERWRITE"
-      service_account_role_arn = module.vpc_cni_irsa.iam_role_arn
     }
   }
-
-  cluster_encryption_config = [{
-      provider_key_arn = aws_kms_key.eks.arn
-      resources        = ["secrets"]
-  }]
 
   cluster_tags = {
     Name = local.cluster_name
