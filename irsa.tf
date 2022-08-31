@@ -15,7 +15,7 @@ data "aws_iam_policy_document" "cluster_autoscaler_sts" {
     condition {
       test     = "StringEquals"
       variable = "${replace(module.eks.oidc_provider_arn, "/^(.*provider/)/", "")}:sub"
-      values   = ["system:serviceaccount:${local.k8s_service_account_namespace}:${local.k8s_service_account_name}"]
+      values   = ["system:serviceaccount:kube-system:cluster-autoscaler"]
     }
 
     # https://aws.amazon.com/premiumsupport/knowledge-center/eks-troubleshoot-oidc-and-irsa/?nc1=h_ls
@@ -72,8 +72,6 @@ resource "aws_iam_policy" "cluster_autoscaler" {
   name        = format("%s-ClusterAutoscalerPolicy", module.eks.cluster_id)
   description = "Cluster autoscaler policy to allow examination and modification of EC2 Auto Scaling Groups"
   policy      = data.aws_iam_policy_document.cluster_autoscaler.json
-
-  tags = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "cluster_autoscaler" {

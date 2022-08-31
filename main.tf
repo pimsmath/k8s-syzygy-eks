@@ -6,30 +6,32 @@ terraform {
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "4.28.0"
+      version = "~>4.0"
     }
     random = {
       source  = "hashicorp/random"
-      version = "3.3.2"
+      version = "~>3.0"
     }
     local = {
       source  = "hashicorp/local"
-      version = "2.2.3"
+      version = "~>2.0"
     }
     null = {
       source  = "hashicorp/null"
-      version = "3.1.1"
+      version = "~>3.0"
     }
     kubernetes = {
       source  = "hashicorp/kubernetes"
-      version = "2.13.0"
+      version = "~>2.0"
     }
   }
 }
 
 provider "aws" {
-    region  = var.region
-    profile = var.profile
+  region = var.region
+}
+
+provider "random" {
 }
 
 provider "kubernetes" {
@@ -45,95 +47,26 @@ provider "kubernetes" {
 }
 
 locals {
-  cluster_name = "syzygy-eks-${random_string.suffix.result}"
-  cluster_version = "1.22"
-  k8s_service_account_namespace = "kube-system"
-  k8s_service_account_name      = "cluster-autoscaler-aws-cluster-autoscaler"
+  cluster_name = format("%s-%s", var.cluster_name_prefix, random_string.suffix.result)
 }
-
-data "aws_caller_identity" "current" {}
 
 resource "random_string" "suffix" {
   length = 8
   special = false
 }
 
-resource "aws_security_group" "worker_group_mgmt_one" {
-  name_prefix = "worker_group_mgmt_one"
-  vpc_id      = module.vpc.vpc_id
+data "aws_caller_identity" "current" {}
 
-  ingress {
-    from_port = 22
-    to_port   = 22
-    protocol  = "tcp"
-
-    cidr_blocks = [
-      "10.0.0.0/8",
-      "172.16.0.0/12",
-      "192.168.0.0/16"
-    ]
-  }
-  tags = var.tags
-}
-
-resource "aws_security_group" "all_worker_mgmt" {
-  name_prefix = "all_worker_management"
-  vpc_id      = module.vpc.vpc_id
-
-  ingress {
-    from_port = 22
-    to_port   = 22
-    protocol  = "tcp"
-
-    cidr_blocks = [
-      "10.0.0.0/8",
-      "172.16.0.0/12",
-      "192.168.0.0/16",
-    ]
-  }
-  tags = var.tags
-}
-
-module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 3.0"
-
-  name                 = local.cluster_name
-  cidr                 = "10.1.0.0/16"
-
-  azs                  = ["${var.region}a", "${var.region}b"]
-
-  private_subnets      = ["10.1.1.0/24", "10.1.2.0/24"]
-  public_subnets       = ["10.1.101.0/24", "10.1.102.0/24"]
-
-  enable_nat_gateway   = true
-  single_nat_gateway   = true
-  enable_dns_hostnames = true
-
-  enable_flow_log                      = true
-  create_flow_log_cloudwatch_iam_role  = true
-  create_flow_log_cloudwatch_log_group = true
-
-  public_subnet_tags = {
-    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
-    "kubernetes.io/role/elb"                      = "1"
-  }
-
-  private_subnet_tags = {
-    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
-    "kubernetes.io/role/internal-elb"             = "1"
-  }
-
-  tags = var.tags
-}
-
+################################################################################
+# EKS Module
+################################################################################
 
 module "eks" {
+  
+  source                          = "terraform-aws-modules/eks/aws"
 
-  source       = "terraform-aws-modules/eks/aws"
-
-  cluster_name    = local.cluster_name
-  cluster_version = local.cluster_version
+  cluster_name                    = local.cluster_name
+  cluster_version                 = var.cluster_version
 
   cluster_endpoint_private_access = true
   cluster_endpoint_public_access  = true
@@ -144,17 +77,19 @@ module "eks" {
     }
     kube-proxy = {}
     vpc-cni = {
-      resolve_conflicts        = "OVERWRITE"
+      resolve_conflicts = "OVERWRITE"
     }
   }
 
-  cluster_tags = {
-    Name = local.cluster_name
-  }
+  cluster_encryption_config = [{
+    provider_key_arn = aws_kms_key.eks.arn
+    resources        = ["secrets"]
+  }]
 
-  vpc_id       = module.vpc.vpc_id
-  subnet_ids   = module.vpc.private_subnets
+  vpc_id     = module.vpc.vpc_id
+  subnet_ids = module.vpc.private_subnets
 
+  # Self managed node groups will not automatically create the aws-auth configmap so we need to
   create_aws_auth_configmap = true
   manage_aws_auth_configmap = true
 
@@ -199,48 +134,102 @@ module "eks" {
       "k8s.io/cluster-autoscaler/enabled" : true,
       "k8s.io/cluster-autoscaler/${local.cluster_name}" : "owned",
     }
-    iam_role_attach_cni_policy = true
   }
 
   self_managed_node_groups = {
-
+    # Default node group - as provisioned by the module defaults
     default_node_group = {}
 
-    workers = {
-      name                          = "worker-group-1"
+    # Bottlerocket node group
+    jh_user_node_group = {
+      name = "jh_user_node_group-1"
 
-      ami_id  = data.aws_ami.eks_default.id
-      instance_type                 = var.worker_group_user_node_type
+      ami_id        = data.aws_ami.eks_default.id
+      instance_type = var.worker_node_group_node_type
+      desired_size  = var.worker_node_group_desired_size
+      min_size      = var.worker_node_group_min_size
+      max_size      = var.worker_node_group_max_size
+      key_name      = aws_key_pair.this.key_name
 
-      desired_capacity              = var.worker_group_desired_capacity
-      min_size                      = var.worker_group_min_size
-      max_size                      = var.worker_group_max_size
-
-
-      additional_security_group_ids = [aws_security_group.worker_group_mgmt_one.id]
       iam_role_additional_policies = ["arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"]
-
-      bootstrap_extra_args = <<-EOT
-      # The admin host container provides SSH access and runs with "superpowers".
-      # It is disabled by default, but can be disabled explicitly.
-      [settings.host-containers.admin]
-      enabled = false
-      # The control host container provides out-of-band access via SSM.
-      # It is enabled by default, and can be disabled if you do not expect to use SSM.
-      # This could leave you with no way to access the API and change settings on an existing node!
-      [settings.host-containers.control]
-      enabled = true
-
-      [settings.kubernetes.node-labels]
-      "hub.jupyter.org/node-purpose" = "user"
-      ingress = "allowed"
-
-      [settings.kubernetes.node-taints]
-      "hub.jupyter.org/dedicated=user" = "user:NoSchedule"
-      EOT
+    bootstrap_extra_args = "--kubelet-extra-args '--node-labels=hub.jupyter.org/node-purpose=user,ingress=allowed --register-with-taints=hub.jupyter.org/dedicated=user:NoSchedule'"
     }
+
   }
   tags = var.tags
+}
+
+################################################################################
+# Supporting Resources
+################################################################################
+
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 3.0"
+
+  name = local.cluster_name
+  cidr = "10.0.0.0/16"
+
+  # For now ca-central-1 doesn't seem to have a region c
+  azs             = ["${var.region}a", "${var.region}b", "${var.region}d"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.4.0/24", "10.0.5.0/24", "10.0.6.0/24"]
+
+  enable_nat_gateway   = true
+  single_nat_gateway   = true
+  enable_dns_hostnames = true
+
+  enable_flow_log                      = true
+  create_flow_log_cloudwatch_iam_role  = true
+  create_flow_log_cloudwatch_log_group = true
+
+  public_subnet_tags = {
+    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
+    "kubernetes.io/role/elb"              = 1
+  }
+
+  private_subnet_tags = {
+    "kubernetes.io/cluster/${local.cluster_name}" = "shared"
+    "kubernetes.io/role/internal-elb"     = 1
+  }
+
+  tags = var.tags
+}
+
+resource "aws_security_group" "additional" {
+  name_prefix = "${local.cluster_name}-additional"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress {
+    from_port = 22
+    to_port   = 22
+    protocol  = "tcp"
+    cidr_blocks = [
+      "10.0.0.0/8",
+      "172.16.0.0/12",
+      "192.168.0.0/16",
+    ]
+  }
+
+  tags = var.tags
+}
+
+resource "aws_kms_key" "eks" {
+  description             = "EKS Secret Encryption Key"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  tags = var.tags
+}
+
+data "aws_ami" "eks_default" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["amazon-eks-node-${var.cluster_version}-v*"]
+  }
 }
 
 resource "aws_efs_file_system" "home" {
@@ -268,121 +257,24 @@ resource "aws_security_group" "efs_mt_sg" {
     protocol  = "tcp"
 
     cidr_blocks = [
-      "10.1.0.0/16"
+      "10.0.0.0/16"
     ]
   }
-
-  tags = var.tags
 }
 
-resource "aws_kms_key" "eks" {
-  description             = "EKS Secret Encryption Key"
+resource "tls_private_key" "this" {
+  algorithm = "RSA"
+}
+
+resource "aws_key_pair" "this" {
+  key_name   = local.cluster_name
+  public_key = tls_private_key.this.public_key_openssh
+}
+
+resource "aws_kms_key" "ebs" {
+  description             = "Customer managed key to encrypt self managed node group volumes"
   deletion_window_in_days = 7
-  enable_key_rotation     = true
-
-  tags = var.tags
-}
-
-data "aws_ami" "eks_default" {
-  most_recent = true
-  owners      = ["amazon"]
-
-  filter {
-    name   = "name"
-    values = ["amazon-eks-node-${local.cluster_version}-v*"]
-  }
-}
-
-resource "aws_iam_role_policy_attachment" "additional" {
-  for_each = module.eks.eks_managed_node_groups
-
-  policy_arn = aws_iam_policy.node_additional.arn
-  role       = each.value.iam_role_name
-}
-
-resource "aws_launch_template" "external" {
-  name_prefix            = "external-eks-ex-"
-  description            = "EKS managed node group external launch template"
-  update_default_version = true
-
-  block_device_mappings {
-    device_name = "/dev/xvda"
-
-    ebs {
-      volume_size           = 100
-      volume_type           = "gp2"
-      delete_on_termination = true
-    }
-  }
-
-  monitoring {
-    enabled = true
-  }
-
-  # Disabling due to https://github.com/hashicorp/terraform-provider-aws/issues/23766
-  # network_interfaces {
-  #   associate_public_ip_address = false
-  #   delete_on_termination       = true
-  # }
-
-  # if you want to use a custom AMI
-  # image_id      = var.ami_id
-
-  # If you use a custom AMI, you need to supply via user-data, the bootstrap script as EKS DOESNT merge its managed user-data then
-  # you can add more than the minimum code you see in the template, e.g. install SSM agent, see https://github.com/aws/containers-roadmap/issues/593#issuecomment-577181345
-  # (optionally you can use https://registry.terraform.io/providers/hashicorp/cloudinit/latest/docs/data-sources/cloudinit_config to render the script, example: https://github.com/terraform-aws-modules/terraform-aws-eks/pull/997#issuecomment-705286151)
-  # user_data = base64encode(data.template_file.launch_template_userdata.rendered)
-
-  tag_specifications {
-    resource_type = "instance"
-
-    tags = {
-      Name      = "external_lt"
-      CustomTag = "Instance custom tag"
-    }
-  }
-
-  tag_specifications {
-    resource_type = "volume"
-
-    tags = {
-      CustomTag = "Volume custom tag"
-    }
-  }
-
-  tag_specifications {
-    resource_type = "network-interface"
-
-    tags = {
-      CustomTag = "EKS example"
-    }
-  }
-
-  tags = var.tags
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_iam_policy" "node_additional" {
-  name        = "${local.cluster_name}-additional"
-  description = "Example usage of node additional policy"
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "ec2:Describe*",
-        ]
-        Effect   = "Allow"
-        Resource = "*"
-      },
-    ]
-  })
-
-  tags = var.tags
+  policy                  = data.aws_iam_policy_document.ebs.json
 }
 
 # This policy is required for the KMS key used for EKS root volumes, so the cluster is allowed to enc/dec/attach encrypted EBS volumes

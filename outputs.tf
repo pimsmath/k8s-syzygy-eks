@@ -37,3 +37,8 @@ output "subnet_id" {
   description = "Publicly accessible subnet inside our VPC"
   value       = module.vpc.public_subnets[0]
 }
+
+output "cluster_autoscaler_role" {
+  description = "ARN of the autoscaler role"
+  value = aws_iam_role.cluster_autoscaler.arn
+}
