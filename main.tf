@@ -72,9 +72,6 @@ module "eks" {
   cluster_endpoint_public_access  = true
 
   cluster_addons = {
-    coredns = {
-      resolve_conflicts = "OVERWRITE"
-    }
     kube-proxy = {}
     vpc-cni = {
       resolve_conflicts = "OVERWRITE"
